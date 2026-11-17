@@ -1,0 +1,51 @@
+# AutoPress - exact versions (Python 3.12.10 64-bit from python.org). OWNED BY A1.
+# Runtime + test set = `pip freeze` of .venv on 2026-11-17 (pip check clean).
+# Install:  .venv\Scripts\python.exe -m pip install -r requirements.txt
+# Never use the "python" on PATH (Anaconda 3.9).
+
+# --- runtime: bundled into AutoPress.exe
+PyQt6==6.12.1
+PyQt6-Qt6==6.12.0
+PyQt6_sip==13.13.1
+numpy==2.5.5
+pillow==13.0.0
+mss==10.2.0
+# OCR: RapidOCR + PP-OCRv6 small models shipped in the wheel (docs/research/ocr.md section 1).
+# recognize_code_line uses rapidocr internals -> keep rapidocr pinned at 3.10.0.
+rapidocr==3.10.0
+onnxruntime==1.32.0
+opencv-python-headless==5.0.0.93
+shapely==2.2.0
+pyclipper==1.4.0
+omegaconf==2.4.0
+PyYAML==6.0.3
+six==1.17.0
+tqdm==4.70.1
+colorlog==6.12.0
+requests==2.34.2
+urllib3==2.8.0
+certifi==2026.10.23
+charset-normalizer==3.5.2
+idna==3.20
+protobuf==7.36.2
+flatbuffers==25.12.19
+packaging==26.3
+
+# --- test
+pytest==9.2.0
+pytest-qt==4.5.0
+iniconfig==2.3.1
+pluggy==1.7.0
+Pygments==2.21.0
+colorama==0.4.6
+typing_extensions==4.16.0
+
+# --- build (G8; NOT yet installed in .venv - versions from the OCR packaging test venv,
+# docs/research/ocr.md section 6). Install only when building:
+#   .venv\Scripts\python.exe -m pip install pyinstaller==6.22.3 pyinstaller-hooks-contrib==2026.10
+# pyinstaller==6.22.3
+# pyinstaller-hooks-contrib==2026.10
+# altgraph==0.17.5
+# pefile==2024.8.26
+# pywin32-ctypes==0.2.3
+# setuptools==84.2.1

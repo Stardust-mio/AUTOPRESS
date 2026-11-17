@@ -1,0 +1,5330 @@
+{
+ "note": "Generated from the group stubs by tools/interface_snapshot.py (A1). Do not edit or regenerate.",
+ "modules": {
+  "autopress.__main__": {
+   "functions": {},
+   "classes": {},
+   "constants": []
+  },
+  "autopress.capture": {
+   "functions": {
+    "grab_rect": [
+     {
+      "name": "rect",
+      "kind": "positional_or_keyword",
+      "default": false
+     }
+    ],
+    "looks_blank": [
+     {
+      "name": "image",
+      "kind": "positional_or_keyword",
+      "default": false
+     },
+     {
+      "name": "std_threshold",
+      "kind": "positional_or_keyword",
+      "default": true
+     }
+    ]
+   },
+   "classes": {
+    "CaptureError": {
+     "bases": [
+      "builtins.RuntimeError"
+     ],
+     "methods": {},
+     "properties": [],
+     "signals": [],
+     "enum_members": {},
+     "fields": []
+    },
+    "Grabber": {
+     "bases": [],
+     "methods": {
+      "__init__": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ],
+      "grab": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "rect",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ],
+      "grab_monitor": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "monitor",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ],
+      "grab_all": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ],
+      "grab_client": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "hwnd",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "region",
+        "kind": "positional_or_keyword",
+        "default": true
+       },
+       {
+        "name": "mode",
+        "kind": "positional_or_keyword",
+        "default": true
+       }
+      ],
+      "close": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ],
+      "__enter__": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ],
+      "__exit__": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "exc",
+        "kind": "var_positional",
+        "default": false
+       }
+      ]
+     },
+     "properties": [],
+     "signals": [],
+     "enum_members": {},
+     "fields": []
+    }
+   },
+   "constants": []
+  },
+  "autopress.codes": {
+   "functions": {},
+   "classes": {},
+   "constants": []
+  },
+  "autopress.codes.csvexport": {
+   "functions": {
+    "export_codes_csv": [
+     {
+      "name": "path",
+      "kind": "positional_or_keyword",
+      "default": false
+     },
+     {
+      "name": "items",
+      "kind": "positional_or_keyword",
+      "default": false
+     }
+    ],
+    "export_history_csv": [
+     {
+      "name": "path",
+      "kind": "positional_or_keyword",
+      "default": false
+     },
+     {
+      "name": "records",
+      "kind": "positional_or_keyword",
+      "default": false
+     }
+    ]
+   },
+   "classes": {},
+   "constants": []
+  },
+  "autopress.codes.extract": {
+   "functions": {
+    "extract_from_text": [
+     {
+      "name": "text",
+      "kind": "positional_or_keyword",
+      "default": false
+     },
+     {
+      "name": "fmt",
+      "kind": "positional_or_keyword",
+      "default": false
+     }
+    ],
+    "extract_from_ocr": [
+     {
+      "name": "result",
+      "kind": "positional_or_keyword",
+      "default": false
+     },
+     {
+      "name": "fmt",
+      "kind": "positional_or_keyword",
+      "default": false
+     },
+     {
+      "name": "review_threshold",
+      "kind": "positional_or_keyword",
+      "default": true
+     }
+    ],
+    "validate_code": [
+     {
+      "name": "text",
+      "kind": "positional_or_keyword",
+      "default": false
+     },
+     {
+      "name": "fmt",
+      "kind": "positional_or_keyword",
+      "default": false
+     }
+    ],
+    "is_likely_code": [
+     {
+      "name": "token",
+      "kind": "positional_or_keyword",
+      "default": false
+     },
+     {
+      "name": "fmt",
+      "kind": "positional_or_keyword",
+      "default": false
+     }
+    ]
+   },
+   "classes": {},
+   "constants": []
+  },
+  "autopress.codes.fileimport": {
+   "functions": {
+    "read_code_file": [
+     {
+      "name": "path",
+      "kind": "positional_or_keyword",
+      "default": false
+     },
+     {
+      "name": "max_bytes",
+      "kind": "positional_or_keyword",
+      "default": true
+     }
+    ],
+    "file_dialog_filter": []
+   },
+   "classes": {
+    "CodeFileError": {
+     "bases": [
+      "builtins.Exception"
+     ],
+     "methods": {},
+     "properties": [],
+     "signals": [],
+     "enum_members": {},
+     "fields": []
+    }
+   },
+   "constants": [
+    "SUPPORTED_EXTENSIONS"
+   ]
+  },
+  "autopress.codes.history": {
+   "functions": {},
+   "classes": {
+    "HistoryStore": {
+     "bases": [],
+     "methods": {
+      "__init__": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "path",
+        "kind": "positional_or_keyword",
+        "default": true
+       }
+      ],
+      "load": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ],
+      "append": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "record",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ],
+      "update": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "record_id",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "changes",
+        "kind": "var_keyword",
+        "default": false
+       }
+      ],
+      "records": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ],
+      "latest": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "game_key",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "code",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ],
+      "is_done": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "game_key",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "code",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "statuses",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ],
+      "query": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "text",
+        "kind": "positional_or_keyword",
+        "default": true
+       },
+       {
+        "name": "statuses",
+        "kind": "positional_or_keyword",
+        "default": true
+       },
+       {
+        "name": "game_key",
+        "kind": "positional_or_keyword",
+        "default": true
+       }
+      ],
+      "games": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ],
+      "remove": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "record_ids",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ],
+      "clear": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ],
+      "prune_evidence": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "keep_days",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ],
+      "subscribe": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "callback",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ]
+     },
+     "properties": [],
+     "signals": [],
+     "enum_members": {},
+     "fields": []
+    }
+   },
+   "constants": []
+  },
+  "autopress.codes.normalize": {
+   "functions": {
+    "normalize_text": [
+     {
+      "name": "text",
+      "kind": "positional_or_keyword",
+      "default": false
+     },
+     {
+      "name": "ocr",
+      "kind": "positional_or_keyword",
+      "default": true
+     }
+    ],
+    "normalize_code": [
+     {
+      "name": "raw",
+      "kind": "positional_or_keyword",
+      "default": false
+     },
+     {
+      "name": "fmt",
+      "kind": "positional_or_keyword",
+      "default": false
+     }
+    ],
+    "lookalike_indices": [
+     {
+      "name": "code",
+      "kind": "positional_or_keyword",
+      "default": false
+     },
+     {
+      "name": "fmt",
+      "kind": "positional_or_keyword",
+      "default": false
+     }
+    ],
+    "flag_indices": [
+     {
+      "name": "code",
+      "kind": "positional_or_keyword",
+      "default": false
+     },
+     {
+      "name": "char_confs",
+      "kind": "positional_or_keyword",
+      "default": false
+     },
+     {
+      "name": "fmt",
+      "kind": "positional_or_keyword",
+      "default": false
+     },
+     {
+      "name": "threshold",
+      "kind": "positional_or_keyword",
+      "default": true
+     },
+     {
+      "name": "repaired",
+      "kind": "positional_or_keyword",
+      "default": true
+     }
+    ],
+    "strip_separators": [
+     {
+      "name": "code",
+      "kind": "positional_or_keyword",
+      "default": false
+     },
+     {
+      "name": "separators",
+      "kind": "positional_or_keyword",
+      "default": true
+     }
+    ],
+    "split_code": [
+     {
+      "name": "code",
+      "kind": "positional_or_keyword",
+      "default": false
+     },
+     {
+      "name": "mode",
+      "kind": "positional_or_keyword",
+      "default": false
+     },
+     {
+      "name": "separators",
+      "kind": "positional_or_keyword",
+      "default": true
+     },
+     {
+      "name": "group_sizes",
+      "kind": "positional_or_keyword",
+      "default": true
+     }
+    ]
+   },
+   "classes": {},
+   "constants": [
+    "DASHES",
+    "OCR_DASHES",
+    "LOOKALIKE_GROUPS"
+   ]
+  },
+  "autopress.codes.presets": {
+   "functions": {
+    "list_formats": [],
+    "get_format": [
+     {
+      "name": "format_id",
+      "kind": "positional_or_keyword",
+      "default": false
+     }
+    ],
+    "format_label": [
+     {
+      "name": "format_id",
+      "kind": "positional_or_keyword",
+      "default": false
+     }
+    ],
+    "format_example": [
+     {
+      "name": "format_id",
+      "kind": "positional_or_keyword",
+      "default": false
+     }
+    ],
+    "detect_format": [
+     {
+      "name": "text",
+      "kind": "positional_or_keyword",
+      "default": false
+     }
+    ]
+   },
+   "classes": {},
+   "constants": [
+    "BUILTIN_FORMAT_IDS"
+   ]
+  },
+  "autopress.codes.queue": {
+   "functions": {},
+   "classes": {
+    "CodeQueue": {
+     "bases": [],
+     "methods": {
+      "__init__": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "path",
+        "kind": "positional_or_keyword",
+        "default": true
+       },
+       {
+        "name": "autosave",
+        "kind": "keyword_only",
+        "default": true
+       }
+      ],
+      "load": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ],
+      "save": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ],
+      "items": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ],
+      "__len__": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ],
+      "get": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "code_id",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ],
+      "index_of": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "code_id",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ],
+      "find_code": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "code",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "game_key",
+        "kind": "positional_or_keyword",
+        "default": true
+       }
+      ],
+      "add_candidates": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "candidates",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "source",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "source_detail",
+        "kind": "keyword_only",
+        "default": true
+       },
+       {
+        "name": "history",
+        "kind": "keyword_only",
+        "default": true
+       },
+       {
+        "name": "game_key",
+        "kind": "keyword_only",
+        "default": true
+       },
+       {
+        "name": "skip_statuses",
+        "kind": "keyword_only",
+        "default": true
+       },
+       {
+        "name": "game",
+        "kind": "keyword_only",
+        "default": true
+       }
+      ],
+      "add_codes": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "codes",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "source",
+        "kind": "positional_or_keyword",
+        "default": true
+       },
+       {
+        "name": "fmt",
+        "kind": "keyword_only",
+        "default": true
+       },
+       {
+        "name": "kwargs",
+        "kind": "var_keyword",
+        "default": false
+       }
+      ],
+      "update": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "code_id",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "changes",
+        "kind": "var_keyword",
+        "default": false
+       }
+      ],
+      "set_status": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "code_id",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "status",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "message",
+        "kind": "positional_or_keyword",
+        "default": true
+       }
+      ],
+      "remove": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "code_ids",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ],
+      "clear": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "statuses",
+        "kind": "positional_or_keyword",
+        "default": true
+       }
+      ],
+      "move": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "code_ids",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "delta",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ],
+      "move_to": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "code_ids",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "index",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ],
+      "set_checked": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "code_ids",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "checked",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ],
+      "runnable": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "selection",
+        "kind": "positional_or_keyword",
+        "default": true
+       },
+       {
+        "name": "game_key",
+        "kind": "positional_or_keyword",
+        "default": true
+       }
+      ],
+      "retry_failed": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ],
+      "reset": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "code_ids",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ],
+      "assign_game": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "code_ids",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "game_key",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "game",
+        "kind": "positional_or_keyword",
+        "default": true
+       }
+      ],
+      "games": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ],
+      "recover_after_crash": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ],
+      "counts": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ],
+      "subscribe": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "callback",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ]
+     },
+     "properties": [],
+     "signals": [],
+     "enum_members": {},
+     "fields": []
+    }
+   },
+   "constants": []
+  },
+  "autopress.ocr": {
+   "functions": {},
+   "classes": {},
+   "constants": []
+  },
+  "autopress.ocr.engine": {
+   "functions": {
+    "model_files": [
+     {
+      "name": "model_dir",
+      "kind": "positional_or_keyword",
+      "default": true
+     }
+    ]
+   },
+   "classes": {
+    "OcrUnavailable": {
+     "bases": [
+      "builtins.RuntimeError"
+     ],
+     "methods": {},
+     "properties": [],
+     "signals": [],
+     "enum_members": {},
+     "fields": []
+    },
+    "OcrEngine": {
+     "bases": [],
+     "methods": {
+      "__init__": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "model_dir",
+        "kind": "positional_or_keyword",
+        "default": true
+       },
+       {
+        "name": "threads",
+        "kind": "positional_or_keyword",
+        "default": true
+       },
+       {
+        "name": "det_side",
+        "kind": "positional_or_keyword",
+        "default": true
+       }
+      ],
+      "recognize": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "image_bgr",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "upscale",
+        "kind": "positional_or_keyword",
+        "default": true
+       },
+       {
+        "name": "det_side",
+        "kind": "positional_or_keyword",
+        "default": true
+       }
+      ],
+      "reread_line": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "image_bgr",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "quad",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "allowed",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ],
+      "warmup": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ]
+     },
+     "properties": [],
+     "signals": [],
+     "enum_members": {},
+     "fields": []
+    }
+   },
+   "constants": [
+    "DET_MODEL",
+    "REC_MODEL"
+   ]
+  },
+  "autopress.ocr.imageio": {
+   "functions": {
+    "load_image": [
+     {
+      "name": "path",
+      "kind": "positional_or_keyword",
+      "default": false
+     }
+    ],
+    "to_bgr": [
+     {
+      "name": "image",
+      "kind": "positional_or_keyword",
+      "default": false
+     }
+    ],
+    "qimage_to_bgr": [
+     {
+      "name": "image",
+      "kind": "positional_or_keyword",
+      "default": false
+     }
+    ],
+    "to_qimage": [
+     {
+      "name": "image",
+      "kind": "positional_or_keyword",
+      "default": false
+     },
+     {
+      "name": "dpr",
+      "kind": "positional_or_keyword",
+      "default": true
+     }
+    ],
+    "clipboard_image": [],
+    "save_png": [
+     {
+      "name": "image",
+      "kind": "positional_or_keyword",
+      "default": false
+     },
+     {
+      "name": "path",
+      "kind": "positional_or_keyword",
+      "default": false
+     }
+    ],
+    "mask_rects": [
+     {
+      "name": "image",
+      "kind": "positional_or_keyword",
+      "default": false
+     },
+     {
+      "name": "origin",
+      "kind": "positional_or_keyword",
+      "default": false
+     },
+     {
+      "name": "rects",
+      "kind": "positional_or_keyword",
+      "default": false
+     }
+    ],
+    "crop": [
+     {
+      "name": "image",
+      "kind": "positional_or_keyword",
+      "default": false
+     },
+     {
+      "name": "rect",
+      "kind": "positional_or_keyword",
+      "default": false
+     }
+    ],
+    "upscale": [
+     {
+      "name": "image",
+      "kind": "positional_or_keyword",
+      "default": false
+     },
+     {
+      "name": "k",
+      "kind": "positional_or_keyword",
+      "default": false
+     }
+    ],
+    "image_dialog_filter": []
+   },
+   "classes": {
+    "ImageLoadError": {
+     "bases": [
+      "builtins.Exception"
+     ],
+     "methods": {},
+     "properties": [],
+     "signals": [],
+     "enum_members": {},
+     "fields": []
+    }
+   },
+   "constants": [
+    "IMAGE_EXTENSIONS"
+   ]
+  },
+  "autopress.ocr.service": {
+   "functions": {},
+   "classes": {
+    "OcrState": {
+     "bases": [
+      "enum.StrEnum"
+     ],
+     "methods": {},
+     "properties": [],
+     "signals": [],
+     "enum_members": {
+      "NOT_STARTED": "not_started",
+      "LOADING": "loading",
+      "READY": "ready",
+      "FAILED": "failed",
+      "DISABLED": "disabled"
+     },
+     "fields": []
+    },
+    "OcrCancelled": {
+     "bases": [
+      "builtins.Exception"
+     ],
+     "methods": {},
+     "properties": [],
+     "signals": [],
+     "enum_members": {},
+     "fields": []
+    },
+    "OcrTimeout": {
+     "bases": [
+      "builtins.TimeoutError"
+     ],
+     "methods": {},
+     "properties": [],
+     "signals": [],
+     "enum_members": {},
+     "fields": []
+    },
+    "OcrService": {
+     "bases": [
+      "PyQt6.QtCore.QObject"
+     ],
+     "methods": {
+      "__init__": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "settings",
+        "kind": "positional_or_keyword",
+        "default": true
+       },
+       {
+        "name": "engine_factory",
+        "kind": "positional_or_keyword",
+        "default": true
+       },
+       {
+        "name": "parent",
+        "kind": "positional_or_keyword",
+        "default": true
+       }
+      ],
+      "start": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ],
+      "shutdown": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "timeout_s",
+        "kind": "positional_or_keyword",
+        "default": true
+       }
+      ],
+      "restart": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "settings",
+        "kind": "positional_or_keyword",
+        "default": true
+       }
+      ],
+      "wait_ready": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "timeout_s",
+        "kind": "positional_or_keyword",
+        "default": true
+       },
+       {
+        "name": "cancel",
+        "kind": "positional_or_keyword",
+        "default": true
+       }
+      ],
+      "submit": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "image",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "opts",
+        "kind": "positional_or_keyword",
+        "default": true
+       },
+       {
+        "name": "priority",
+        "kind": "positional_or_keyword",
+        "default": true
+       }
+      ],
+      "recognize": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "image",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "opts",
+        "kind": "positional_or_keyword",
+        "default": true
+       },
+       {
+        "name": "timeout_s",
+        "kind": "keyword_only",
+        "default": true
+       },
+       {
+        "name": "cancel",
+        "kind": "keyword_only",
+        "default": true
+       },
+       {
+        "name": "priority",
+        "kind": "keyword_only",
+        "default": true
+       }
+      ],
+      "request": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "image",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "opts",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "on_done",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "on_error",
+        "kind": "positional_or_keyword",
+        "default": true
+       },
+       {
+        "name": "priority",
+        "kind": "positional_or_keyword",
+        "default": true
+       }
+      ],
+      "cancel_request": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "job_id",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ]
+     },
+     "properties": [
+      "state",
+      "error"
+     ],
+     "signals": [
+      "state_changed"
+     ],
+     "enum_members": {},
+     "fields": [],
+     "signal_signatures": {
+      "state_changed": "state_changed(QString)"
+     }
+    }
+   },
+   "constants": []
+  },
+  "autopress.ocr.textfind": {
+   "functions": {
+    "find_text": [
+     {
+      "name": "lines",
+      "kind": "positional_or_keyword",
+      "default": false
+     },
+     {
+      "name": "query",
+      "kind": "positional_or_keyword",
+      "default": false
+     },
+     {
+      "name": "match",
+      "kind": "positional_or_keyword",
+      "default": true
+     },
+     {
+      "name": "nth",
+      "kind": "positional_or_keyword",
+      "default": true
+     },
+     {
+      "name": "min_score",
+      "kind": "positional_or_keyword",
+      "default": true
+     }
+    ],
+    "find_all": [
+     {
+      "name": "lines",
+      "kind": "positional_or_keyword",
+      "default": false
+     },
+     {
+      "name": "query",
+      "kind": "positional_or_keyword",
+      "default": false
+     },
+     {
+      "name": "match",
+      "kind": "positional_or_keyword",
+      "default": true
+     },
+     {
+      "name": "min_score",
+      "kind": "positional_or_keyword",
+      "default": true
+     }
+    ],
+    "text_present": [
+     {
+      "name": "lines",
+      "kind": "positional_or_keyword",
+      "default": false
+     },
+     {
+      "name": "query",
+      "kind": "positional_or_keyword",
+      "default": false
+     },
+     {
+      "name": "match",
+      "kind": "positional_or_keyword",
+      "default": true
+     },
+     {
+      "name": "min_score",
+      "kind": "positional_or_keyword",
+      "default": true
+     }
+    ]
+   },
+   "classes": {},
+   "constants": []
+  },
+  "autopress.runner": {
+   "functions": {},
+   "classes": {},
+   "constants": []
+  },
+  "autopress.runner.backend": {
+   "functions": {},
+   "classes": {},
+   "constants": []
+  },
+  "autopress.runner.classify": {
+   "functions": {
+    "classify_text": [
+     {
+      "name": "text",
+      "kind": "positional_or_keyword",
+      "default": false
+     },
+     {
+      "name": "keywords",
+      "kind": "positional_or_keyword",
+      "default": false
+     }
+    ]
+   },
+   "classes": {},
+   "constants": []
+  },
+  "autopress.runner.control": {
+   "functions": {},
+   "classes": {
+    "StopRequested": {
+     "bases": [
+      "builtins.Exception"
+     ],
+     "methods": {
+      "__init__": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "reason",
+        "kind": "positional_or_keyword",
+        "default": true
+       }
+      ]
+     },
+     "properties": [],
+     "signals": [],
+     "enum_members": {},
+     "fields": []
+    },
+    "RunControl": {
+     "bases": [],
+     "methods": {
+      "__init__": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "tick",
+        "kind": "positional_or_keyword",
+        "default": true
+       },
+       {
+        "name": "slice_s",
+        "kind": "positional_or_keyword",
+        "default": true
+       }
+      ],
+      "request_pause": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ],
+      "request_resume": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ],
+      "request_stop": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "reason",
+        "kind": "positional_or_keyword",
+        "default": true
+       }
+      ],
+      "checkpoint": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ],
+      "sleep": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "seconds",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ],
+      "wait_while_paused": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ]
+     },
+     "properties": [
+      "pause_requested",
+      "stop_requested",
+      "stop_reason"
+     ],
+     "signals": [],
+     "enum_members": {},
+     "fields": []
+    }
+   },
+   "constants": []
+  },
+  "autopress.runner.engine": {
+   "functions": {},
+   "classes": {
+    "RunSession": {
+     "bases": [
+      "PyQt6.QtCore.QObject"
+     ],
+     "methods": {
+      "__init__": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "queue",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "history",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "ocr",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "backend_factory",
+        "kind": "keyword_only",
+        "default": true
+       },
+       {
+        "name": "parent",
+        "kind": "keyword_only",
+        "default": true
+       }
+      ],
+      "is_active": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ],
+      "build_plan": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "profile",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "settings",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "selection",
+        "kind": "positional_or_keyword",
+        "default": true
+       },
+       {
+        "name": "code_ids",
+        "kind": "keyword_only",
+        "default": true
+       },
+       {
+        "name": "target_hwnd",
+        "kind": "keyword_only",
+        "default": true
+       },
+       {
+        "name": "mode",
+        "kind": "keyword_only",
+        "default": true
+       }
+      ],
+      "preflight": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "plan",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ],
+      "start": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "plan",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ],
+      "pause": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ],
+      "resume": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ],
+      "toggle_pause": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ],
+      "stop": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "reason",
+        "kind": "positional_or_keyword",
+        "default": true
+       }
+      ],
+      "resolve_attention": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "code_id",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "status",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "message",
+        "kind": "positional_or_keyword",
+        "default": true
+       }
+      ],
+      "set_masked_rects": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "rects",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ],
+      "update_keywords": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "keywords",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ],
+      "test_step": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "profile",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "step_index",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "settings",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "sample_code",
+        "kind": "keyword_only",
+        "default": true
+       },
+       {
+        "name": "dry_run",
+        "kind": "keyword_only",
+        "default": true
+       },
+       {
+        "name": "target_hwnd",
+        "kind": "keyword_only",
+        "default": true
+       }
+      ],
+      "shutdown": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "timeout_s",
+        "kind": "positional_or_keyword",
+        "default": true
+       }
+      ]
+     },
+     "properties": [
+      "state",
+      "plan"
+     ],
+     "signals": [
+      "state_changed",
+      "progress",
+      "code_started",
+      "step_started",
+      "code_finished",
+      "log",
+      "cooldown",
+      "waiting",
+      "attention",
+      "finished",
+      "test_finished"
+     ],
+     "enum_members": {},
+     "fields": [],
+     "signal_signatures": {
+      "state_changed": "state_changed(QString,QString)",
+      "progress": "progress(int,int,double)",
+      "code_started": "code_started(QString,int)",
+      "step_started": "step_started(QString,int,QString)",
+      "code_finished": "code_finished(QString,PyQt_PyObject)",
+      "log": "log(PyQt_PyObject)",
+      "cooldown": "cooldown(double)",
+      "waiting": "waiting(double)",
+      "attention": "attention(PyQt_PyObject)",
+      "finished": "finished(PyQt_PyObject)",
+      "test_finished": "test_finished(PyQt_PyObject)"
+     }
+    }
+   },
+   "constants": []
+  },
+  "autopress.runner.preflight": {
+   "functions": {
+    "run_preflight": [
+     {
+      "name": "profile",
+      "kind": "positional_or_keyword",
+      "default": false
+     },
+     {
+      "name": "settings",
+      "kind": "positional_or_keyword",
+      "default": false
+     },
+     {
+      "name": "code_count",
+      "kind": "keyword_only",
+      "default": false
+     },
+     {
+      "name": "ocr_state",
+      "kind": "keyword_only",
+      "default": false
+     },
+     {
+      "name": "target_hwnd",
+      "kind": "keyword_only",
+      "default": true
+     },
+     {
+      "name": "backend",
+      "kind": "keyword_only",
+      "default": true
+     },
+     {
+      "name": "unassigned_count",
+      "kind": "keyword_only",
+      "default": true
+     }
+    ]
+   },
+   "classes": {},
+   "constants": []
+  },
+  "autopress.runner.preview": {
+   "functions": {
+    "preview_profile": [
+     {
+      "name": "profile",
+      "kind": "positional_or_keyword",
+      "default": false
+     },
+     {
+      "name": "hwnd",
+      "kind": "positional_or_keyword",
+      "default": false
+     },
+     {
+      "name": "backend",
+      "kind": "keyword_only",
+      "default": true
+     }
+    ]
+   },
+   "classes": {},
+   "constants": []
+  },
+  "autopress.runner.steps": {
+   "functions": {},
+   "classes": {},
+   "constants": []
+  },
+  "autopress.selftest": {
+   "functions": {
+    "run": [
+     {
+      "name": "report_path",
+      "kind": "positional_or_keyword",
+      "default": false
+     }
+    ]
+   },
+   "classes": {},
+   "constants": []
+  },
+  "autopress.ui": {
+   "functions": {},
+   "classes": {},
+   "constants": []
+  },
+  "autopress.ui.app": {
+   "functions": {
+    "main": [
+     {
+      "name": "argv",
+      "kind": "positional_or_keyword",
+      "default": true
+     }
+    ],
+    "create_application": [
+     {
+      "name": "argv",
+      "kind": "positional_or_keyword",
+      "default": false
+     }
+    ],
+    "build_context": [
+     {
+      "name": "app",
+      "kind": "positional_or_keyword",
+      "default": false
+     },
+     {
+      "name": "settings",
+      "kind": "positional_or_keyword",
+      "default": true
+     }
+    ]
+   },
+   "classes": {},
+   "constants": []
+  },
+  "autopress.ui.codes_model": {
+   "functions": {},
+   "classes": {
+    "CodesTableModel": {
+     "bases": [
+      "PyQt6.QtCore.QAbstractTableModel"
+     ],
+     "methods": {
+      "__init__": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "queue",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "parent",
+        "kind": "positional_or_keyword",
+        "default": true
+       }
+      ],
+      "item_at": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "row",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ],
+      "row_of": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "code_id",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ],
+      "rowCount": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "parent",
+        "kind": "positional_or_keyword",
+        "default": true
+       }
+      ],
+      "columnCount": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "parent",
+        "kind": "positional_or_keyword",
+        "default": true
+       }
+      ]
+     },
+     "properties": [],
+     "signals": [],
+     "enum_members": {},
+     "fields": []
+    },
+    "CodesFilterProxy": {
+     "bases": [
+      "PyQt6.QtCore.QSortFilterProxyModel"
+     ],
+     "methods": {
+      "set_filter": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "key",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ],
+      "set_search": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "text",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ],
+      "set_game": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "game_key",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ]
+     },
+     "properties": [],
+     "signals": [],
+     "enum_members": {},
+     "fields": []
+    },
+    "CodeDelegate": {
+     "bases": [
+      "PyQt6.QtWidgets.QStyledItemDelegate"
+     ],
+     "methods": {},
+     "properties": [],
+     "signals": [],
+     "enum_members": {},
+     "fields": []
+    },
+    "ConfidenceDelegate": {
+     "bases": [
+      "PyQt6.QtWidgets.QStyledItemDelegate"
+     ],
+     "methods": {},
+     "properties": [],
+     "signals": [],
+     "enum_members": {},
+     "fields": []
+    },
+    "StatusDelegate": {
+     "bases": [
+      "PyQt6.QtWidgets.QStyledItemDelegate"
+     ],
+     "methods": {},
+     "properties": [],
+     "signals": [],
+     "enum_members": {},
+     "fields": []
+    }
+   },
+   "constants": [
+    "COL_CHECK",
+    "COL_INDEX",
+    "COL_CODE",
+    "COL_SOURCE",
+    "COL_CONF",
+    "COL_STATUS",
+    "COL_MESSAGE",
+    "COL_MORE",
+    "COLUMNS",
+    "ROLE_ITEM",
+    "ROLE_FLAGGED",
+    "ROLE_STATUS",
+    "ROLE_LOOKALIKES",
+    "ROLE_GAME",
+    "FILTERS"
+   ]
+  },
+  "autopress.ui.codes_page": {
+   "functions": {},
+   "classes": {
+    "CodesPage": {
+     "bases": [
+      "PyQt6.QtWidgets.QWidget"
+     ],
+     "methods": {
+      "__init__": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "ctx",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ],
+      "import_text": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "text",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "source",
+        "kind": "positional_or_keyword",
+        "default": true
+       },
+       {
+        "name": "detail",
+        "kind": "positional_or_keyword",
+        "default": true
+       }
+      ],
+      "import_file": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "path",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ],
+      "import_image": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "image",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "source",
+        "kind": "positional_or_keyword",
+        "default": true
+       },
+       {
+        "name": "detail",
+        "kind": "positional_or_keyword",
+        "default": true
+       }
+      ]
+     },
+     "properties": [],
+     "signals": [],
+     "enum_members": {},
+     "fields": []
+    }
+   },
+   "constants": []
+  },
+  "autopress.ui.help_page": {
+   "functions": {},
+   "classes": {
+    "HelpPage": {
+     "bases": [
+      "PyQt6.QtWidgets.QWidget"
+     ],
+     "methods": {
+      "__init__": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "ctx",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ]
+     },
+     "properties": [],
+     "signals": [],
+     "enum_members": {},
+     "fields": []
+    }
+   },
+   "constants": []
+  },
+  "autopress.ui.history_page": {
+   "functions": {},
+   "classes": {
+    "HistoryPage": {
+     "bases": [
+      "PyQt6.QtWidgets.QWidget"
+     ],
+     "methods": {
+      "__init__": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "ctx",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ]
+     },
+     "properties": [],
+     "signals": [],
+     "enum_members": {},
+     "fields": []
+    }
+   },
+   "constants": []
+  },
+  "autopress.ui.icons": {
+   "functions": {
+    "icon": [
+     {
+      "name": "name",
+      "kind": "positional_or_keyword",
+      "default": false
+     },
+     {
+      "name": "color_token",
+      "kind": "positional_or_keyword",
+      "default": true
+     },
+     {
+      "name": "size",
+      "kind": "positional_or_keyword",
+      "default": true
+     }
+    ],
+    "icon_pixmap": [
+     {
+      "name": "name",
+      "kind": "positional_or_keyword",
+      "default": false
+     },
+     {
+      "name": "color",
+      "kind": "positional_or_keyword",
+      "default": false
+     },
+     {
+      "name": "size",
+      "kind": "positional_or_keyword",
+      "default": true
+     },
+     {
+      "name": "stroke",
+      "kind": "positional_or_keyword",
+      "default": true
+     }
+    ],
+    "app_icon": []
+   },
+   "classes": {},
+   "constants": [
+    "ICON_NAMES"
+   ]
+  },
+  "autopress.ui.keywords_editor": {
+   "functions": {},
+   "classes": {
+    "KeywordsEditor": {
+     "bases": [
+      "PyQt6.QtWidgets.QWidget"
+     ],
+     "methods": {
+      "__init__": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "parent",
+        "kind": "positional_or_keyword",
+        "default": true
+       }
+      ],
+      "set_config": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "config",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ],
+      "config": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ],
+      "add_keyword": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "result",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "keyword",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ]
+     },
+     "properties": [],
+     "signals": [
+      "changed"
+     ],
+     "enum_members": {},
+     "fields": [],
+     "signal_signatures": {
+      "changed": "changed()"
+     }
+    }
+   },
+   "constants": []
+  },
+  "autopress.ui.main_window": {
+   "functions": {},
+   "classes": {
+    "MainWindow": {
+     "bases": [
+      "PyQt6.QtWidgets.QMainWindow"
+     ],
+     "methods": {
+      "__init__": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "ctx",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ],
+      "navigate": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "page_id",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ],
+      "current_page": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ],
+      "page": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "page_id",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ],
+      "set_badge": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "page_id",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "text",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ],
+      "set_status": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "key",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "text",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "tone",
+        "kind": "positional_or_keyword",
+        "default": true
+       }
+      ],
+      "set_run_mode": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "active",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "minimize",
+        "kind": "positional_or_keyword",
+        "default": true
+       }
+      ]
+     },
+     "properties": [],
+     "signals": [],
+     "enum_members": {},
+     "fields": []
+    }
+   },
+   "constants": []
+  },
+  "autopress.ui.minibar": {
+   "functions": {},
+   "classes": {
+    "MiniBar": {
+     "bases": [
+      "PyQt6.QtWidgets.QWidget"
+     ],
+     "methods": {
+      "__init__": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "ctx",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "parent",
+        "kind": "positional_or_keyword",
+        "default": true
+       }
+      ],
+      "set_progress": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "done",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "total",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "eta_s",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ],
+      "set_current": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "code",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "step_title",
+        "kind": "positional_or_keyword",
+        "default": true
+       }
+      ],
+      "set_state": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "state",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "reason",
+        "kind": "positional_or_keyword",
+        "default": true
+       }
+      ],
+      "add_result": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "status",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ],
+      "place_away_from": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "avoid",
+        "kind": "positional_or_keyword",
+        "default": true
+       },
+       {
+        "name": "target",
+        "kind": "positional_or_keyword",
+        "default": true
+       }
+      ]
+     },
+     "properties": [],
+     "signals": [
+      "pauseClicked",
+      "stopClicked",
+      "expandClicked"
+     ],
+     "enum_members": {},
+     "fields": [],
+     "signal_signatures": {
+      "pauseClicked": "pauseClicked()",
+      "stopClicked": "stopClicked()",
+      "expandClicked": "expandClicked()"
+     }
+    }
+   },
+   "constants": []
+  },
+  "autopress.ui.ocr_review": {
+   "functions": {},
+   "classes": {
+    "OcrReviewDialog": {
+     "bases": [
+      "PyQt6.QtWidgets.QDialog"
+     ],
+     "methods": {
+      "__init__": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "ctx",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "image",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "source",
+        "kind": "positional_or_keyword",
+        "default": true
+       },
+       {
+        "name": "detail",
+        "kind": "positional_or_keyword",
+        "default": true
+       },
+       {
+        "name": "parent",
+        "kind": "positional_or_keyword",
+        "default": true
+       }
+      ],
+      "candidates": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ],
+      "code_format": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ]
+     },
+     "properties": [],
+     "signals": [],
+     "enum_members": {},
+     "fields": []
+    }
+   },
+   "constants": []
+  },
+  "autopress.ui.overlays": {
+   "functions": {
+    "pick": [
+     {
+      "name": "kind",
+      "kind": "positional_or_keyword",
+      "default": false
+     },
+     {
+      "name": "instruction",
+      "kind": "keyword_only",
+      "default": true
+     },
+     {
+      "name": "target_hwnd",
+      "kind": "keyword_only",
+      "default": true
+     },
+     {
+      "name": "hide_windows",
+      "kind": "keyword_only",
+      "default": true
+     }
+    ]
+   },
+   "classes": {
+    "PickResult": {
+     "bases": [],
+     "methods": {},
+     "properties": [],
+     "signals": [],
+     "enum_members": {},
+     "fields": [
+      "kind",
+      "point",
+      "rect",
+      "hwnd",
+      "image"
+     ]
+    },
+    "ScreenPicker": {
+     "bases": [
+      "PyQt6.QtCore.QObject"
+     ],
+     "methods": {
+      "__init__": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "parent",
+        "kind": "positional_or_keyword",
+        "default": true
+       }
+      ],
+      "start": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "kind",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "instruction",
+        "kind": "keyword_only",
+        "default": true
+       },
+       {
+        "name": "target_hwnd",
+        "kind": "keyword_only",
+        "default": true
+       },
+       {
+        "name": "hide_windows",
+        "kind": "keyword_only",
+        "default": true
+       }
+      ],
+      "cancel": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ]
+     },
+     "properties": [],
+     "signals": [
+      "finished"
+     ],
+     "enum_members": {},
+     "fields": [],
+     "signal_signatures": {
+      "finished": "finished(PyQt_PyObject)"
+     }
+    },
+    "PreviewOverlay": {
+     "bases": [
+      "PyQt6.QtCore.QObject"
+     ],
+     "methods": {
+      "__init__": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "parent",
+        "kind": "positional_or_keyword",
+        "default": true
+       }
+      ],
+      "show_marks": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "marks",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "duration_ms",
+        "kind": "positional_or_keyword",
+        "default": true
+       }
+      ],
+      "hide": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ]
+     },
+     "properties": [],
+     "signals": [],
+     "enum_members": {},
+     "fields": []
+    },
+    "CountdownOverlay": {
+     "bases": [
+      "PyQt6.QtCore.QObject"
+     ],
+     "methods": {
+      "__init__": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "parent",
+        "kind": "positional_or_keyword",
+        "default": true
+       }
+      ],
+      "start": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "seconds",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "monitor_rect",
+        "kind": "positional_or_keyword",
+        "default": true
+       },
+       {
+        "name": "hint",
+        "kind": "positional_or_keyword",
+        "default": true
+       }
+      ],
+      "cancel": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ]
+     },
+     "properties": [],
+     "signals": [
+      "done",
+      "cancelled"
+     ],
+     "enum_members": {},
+     "fields": [],
+     "signal_signatures": {
+      "done": "done()",
+      "cancelled": "cancelled()"
+     }
+    }
+   },
+   "constants": []
+  },
+  "autopress.ui.paste_dialog": {
+   "functions": {},
+   "classes": {
+    "PasteDialog": {
+     "bases": [
+      "PyQt6.QtWidgets.QDialog"
+     ],
+     "methods": {
+      "__init__": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "ctx",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "text",
+        "kind": "positional_or_keyword",
+        "default": true
+       },
+       {
+        "name": "source",
+        "kind": "positional_or_keyword",
+        "default": true
+       },
+       {
+        "name": "detail",
+        "kind": "positional_or_keyword",
+        "default": true
+       },
+       {
+        "name": "parent",
+        "kind": "positional_or_keyword",
+        "default": true
+       }
+      ],
+      "candidates": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ],
+      "code_format": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ]
+     },
+     "properties": [],
+     "signals": [],
+     "enum_members": {},
+     "fields": []
+    }
+   },
+   "constants": []
+  },
+  "autopress.ui.profiles_page": {
+   "functions": {},
+   "classes": {
+    "ProfilesPage": {
+     "bases": [
+      "PyQt6.QtWidgets.QWidget"
+     ],
+     "methods": {
+      "__init__": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "ctx",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ],
+      "open_profile": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "profile_id",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ],
+      "new_from_template": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "template_key",
+        "kind": "positional_or_keyword",
+        "default": true
+       }
+      ],
+      "import_profile_file": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "path",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ],
+      "start_wizard": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "profile_id",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "realign",
+        "kind": "positional_or_keyword",
+        "default": true
+       }
+      ]
+     },
+     "properties": [],
+     "signals": [],
+     "enum_members": {},
+     "fields": []
+    }
+   },
+   "constants": []
+  },
+  "autopress.ui.run_flow": {
+   "functions": {},
+   "classes": {
+    "RunFlow": {
+     "bases": [
+      "PyQt6.QtCore.QObject"
+     ],
+     "methods": {
+      "__init__": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "ctx",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "parent",
+        "kind": "positional_or_keyword",
+        "default": true
+       }
+      ],
+      "begin": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "profile",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "selection",
+        "kind": "positional_or_keyword",
+        "default": true
+       },
+       {
+        "name": "code_ids",
+        "kind": "keyword_only",
+        "default": true
+       },
+       {
+        "name": "mode",
+        "kind": "keyword_only",
+        "default": true
+       },
+       {
+        "name": "target_hwnd",
+        "kind": "keyword_only",
+        "default": true
+       }
+      ],
+      "is_running": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ],
+      "resume": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ]
+     },
+     "properties": [],
+     "signals": [
+      "started",
+      "ended"
+     ],
+     "enum_members": {},
+     "fields": [],
+     "signal_signatures": {
+      "started": "started()",
+      "ended": "ended(PyQt_PyObject)"
+     }
+    }
+   },
+   "constants": []
+  },
+  "autopress.ui.run_page": {
+   "functions": {},
+   "classes": {
+    "RunPage": {
+     "bases": [
+      "PyQt6.QtWidgets.QWidget"
+     ],
+     "methods": {
+      "__init__": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "ctx",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ]
+     },
+     "properties": [],
+     "signals": [],
+     "enum_members": {},
+     "fields": []
+    }
+   },
+   "constants": []
+  },
+  "autopress.ui.settings_page": {
+   "functions": {},
+   "classes": {
+    "SettingsPage": {
+     "bases": [
+      "PyQt6.QtWidgets.QWidget"
+     ],
+     "methods": {
+      "__init__": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "ctx",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ]
+     },
+     "properties": [],
+     "signals": [],
+     "enum_members": {},
+     "fields": []
+    }
+   },
+   "constants": []
+  },
+  "autopress.ui.step_editor": {
+   "functions": {},
+   "classes": {
+    "StepListWidget": {
+     "bases": [
+      "PyQt6.QtWidgets.QWidget"
+     ],
+     "methods": {
+      "__init__": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "ctx",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "parent",
+        "kind": "positional_or_keyword",
+        "default": true
+       }
+      ],
+      "set_steps": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "steps",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ],
+      "steps": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ],
+      "current_index": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ]
+     },
+     "properties": [],
+     "signals": [
+      "currentChanged",
+      "stepsChanged"
+     ],
+     "enum_members": {},
+     "fields": [],
+     "signal_signatures": {
+      "currentChanged": "currentChanged(int)",
+      "stepsChanged": "stepsChanged()"
+     }
+    },
+    "StepEditor": {
+     "bases": [
+      "PyQt6.QtWidgets.QWidget"
+     ],
+     "methods": {
+      "__init__": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "ctx",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "parent",
+        "kind": "positional_or_keyword",
+        "default": true
+       }
+      ],
+      "set_step": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "step",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "profile",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "index",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ],
+      "step": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ]
+     },
+     "properties": [],
+     "signals": [
+      "stepChanged"
+     ],
+     "enum_members": {},
+     "fields": [],
+     "signal_signatures": {
+      "stepChanged": "stepChanged(PyQt_PyObject)"
+     }
+    }
+   },
+   "constants": []
+  },
+  "autopress.ui.theme": {
+   "functions": {
+    "resolve_theme": [
+     {
+      "name": "name",
+      "kind": "positional_or_keyword",
+      "default": false
+     }
+    ],
+    "apply_theme": [
+     {
+      "name": "app",
+      "kind": "positional_or_keyword",
+      "default": false
+     },
+     {
+      "name": "name",
+      "kind": "positional_or_keyword",
+      "default": false
+     }
+    ],
+    "current_theme": [],
+    "tokens": [],
+    "color": [
+     {
+      "name": "token",
+      "kind": "positional_or_keyword",
+      "default": false
+     }
+    ],
+    "css": [
+     {
+      "name": "token",
+      "kind": "positional_or_keyword",
+      "default": false
+     }
+    ],
+    "tone_colors": [
+     {
+      "name": "tone",
+      "kind": "positional_or_keyword",
+      "default": false
+     }
+    ],
+    "font": [
+     {
+      "name": "px",
+      "kind": "positional_or_keyword",
+      "default": true
+     },
+     {
+      "name": "bold",
+      "kind": "keyword_only",
+      "default": true
+     },
+     {
+      "name": "mono",
+      "kind": "keyword_only",
+      "default": true
+     },
+     {
+      "name": "tnum",
+      "kind": "keyword_only",
+      "default": true
+     }
+    ],
+    "build_qss": [
+     {
+      "name": "t",
+      "kind": "positional_or_keyword",
+      "default": false
+     }
+    ],
+    "build_palette": [
+     {
+      "name": "t",
+      "kind": "positional_or_keyword",
+      "default": false
+     }
+    ]
+   },
+   "classes": {},
+   "constants": [
+    "FONT_UI",
+    "FONT_MONO",
+    "FONT_NUM",
+    "FS_DISPLAY",
+    "FS_TITLE",
+    "FS_BODY",
+    "FS_SMALL",
+    "FS_CAPTION",
+    "FS_MONO",
+    "SP",
+    "R_SM",
+    "R_MD",
+    "R_LG",
+    "R_XL",
+    "CONTROL_H",
+    "ROW_H",
+    "NAV_H",
+    "CHIP_H",
+    "KEYCAP_H",
+    "SIDEBAR_W",
+    "PAGE_MARGINS",
+    "CARD_MARGINS",
+    "DARK",
+    "LIGHT",
+    "THEMES"
+   ]
+  },
+  "autopress.ui.toast": {
+   "functions": {},
+   "classes": {
+    "ToastManager": {
+     "bases": [
+      "PyQt6.QtCore.QObject"
+     ],
+     "methods": {
+      "__init__": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "host",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ],
+      "attach_signals": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "signals",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ],
+      "show_toast": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "text",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "kind",
+        "kind": "positional_or_keyword",
+        "default": true
+       },
+       {
+        "name": "action_text",
+        "kind": "positional_or_keyword",
+        "default": true
+       },
+       {
+        "name": "action",
+        "kind": "positional_or_keyword",
+        "default": true
+       },
+       {
+        "name": "timeout_ms",
+        "kind": "positional_or_keyword",
+        "default": true
+       }
+      ]
+     },
+     "properties": [],
+     "signals": [],
+     "enum_members": {},
+     "fields": []
+    }
+   },
+   "constants": []
+  },
+  "autopress.ui.welcome": {
+   "functions": {
+    "show_welcome_if_needed": [
+     {
+      "name": "ctx",
+      "kind": "positional_or_keyword",
+      "default": false
+     },
+     {
+      "name": "parent",
+      "kind": "positional_or_keyword",
+      "default": true
+     }
+    ]
+   },
+   "classes": {
+    "WelcomeDialog": {
+     "bases": [
+      "PyQt6.QtWidgets.QDialog"
+     ],
+     "methods": {
+      "__init__": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "ctx",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "parent",
+        "kind": "positional_or_keyword",
+        "default": true
+       }
+      ]
+     },
+     "properties": [],
+     "signals": [],
+     "enum_members": {},
+     "fields": []
+    }
+   },
+   "constants": []
+  },
+  "autopress.ui.widgets": {
+   "functions": {
+    "label": [
+     {
+      "name": "text",
+      "kind": "positional_or_keyword",
+      "default": true
+     },
+     {
+      "name": "role",
+      "kind": "positional_or_keyword",
+      "default": true
+     }
+    ],
+    "push_button": [
+     {
+      "name": "text",
+      "kind": "positional_or_keyword",
+      "default": false
+     },
+     {
+      "name": "variant",
+      "kind": "positional_or_keyword",
+      "default": true
+     },
+     {
+      "name": "icon_name",
+      "kind": "positional_or_keyword",
+      "default": true
+     }
+    ],
+    "icon_button": [
+     {
+      "name": "icon_name",
+      "kind": "positional_or_keyword",
+      "default": false
+     },
+     {
+      "name": "tooltip",
+      "kind": "positional_or_keyword",
+      "default": false
+     },
+     {
+      "name": "variant",
+      "kind": "positional_or_keyword",
+      "default": true
+     }
+    ],
+    "section_header": [
+     {
+      "name": "title",
+      "kind": "positional_or_keyword",
+      "default": false
+     },
+     {
+      "name": "subtitle",
+      "kind": "positional_or_keyword",
+      "default": true
+     },
+     {
+      "name": "actions",
+      "kind": "positional_or_keyword",
+      "default": true
+     }
+    ],
+    "form_row": [
+     {
+      "name": "label_text",
+      "kind": "positional_or_keyword",
+      "default": false
+     },
+     {
+      "name": "field",
+      "kind": "positional_or_keyword",
+      "default": false
+     },
+     {
+      "name": "hint",
+      "kind": "positional_or_keyword",
+      "default": true
+     }
+    ],
+    "combo": [
+     {
+      "name": "items",
+      "kind": "positional_or_keyword",
+      "default": true
+     },
+     {
+      "name": "width",
+      "kind": "positional_or_keyword",
+      "default": true
+     }
+    ],
+    "status_chip_width": [
+     {
+      "name": "status",
+      "kind": "positional_or_keyword",
+      "default": false
+     },
+     {
+      "name": "text",
+      "kind": "positional_or_keyword",
+      "default": true
+     }
+    ],
+    "paint_status_chip": [
+     {
+      "name": "painter",
+      "kind": "positional_or_keyword",
+      "default": false
+     },
+     {
+      "name": "rect",
+      "kind": "positional_or_keyword",
+      "default": false
+     },
+     {
+      "name": "status",
+      "kind": "positional_or_keyword",
+      "default": false
+     },
+     {
+      "name": "text",
+      "kind": "positional_or_keyword",
+      "default": true
+     }
+    ],
+    "confirm": [
+     {
+      "name": "parent",
+      "kind": "positional_or_keyword",
+      "default": false
+     },
+     {
+      "name": "title",
+      "kind": "positional_or_keyword",
+      "default": false
+     },
+     {
+      "name": "text",
+      "kind": "positional_or_keyword",
+      "default": false
+     },
+     {
+      "name": "ok_text",
+      "kind": "positional_or_keyword",
+      "default": true
+     },
+     {
+      "name": "cancel_text",
+      "kind": "positional_or_keyword",
+      "default": true
+     },
+     {
+      "name": "danger",
+      "kind": "positional_or_keyword",
+      "default": true
+     }
+    ],
+    "message": [
+     {
+      "name": "parent",
+      "kind": "positional_or_keyword",
+      "default": false
+     },
+     {
+      "name": "title",
+      "kind": "positional_or_keyword",
+      "default": false
+     },
+     {
+      "name": "text",
+      "kind": "positional_or_keyword",
+      "default": false
+     },
+     {
+      "name": "kind",
+      "kind": "positional_or_keyword",
+      "default": true
+     }
+    ]
+   },
+   "classes": {
+    "Switch": {
+     "bases": [
+      "PyQt6.QtWidgets.QAbstractButton"
+     ],
+     "methods": {
+      "__init__": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "checked",
+        "kind": "positional_or_keyword",
+        "default": true
+       },
+       {
+        "name": "parent",
+        "kind": "positional_or_keyword",
+        "default": true
+       }
+      ]
+     },
+     "properties": [],
+     "signals": [],
+     "enum_members": {},
+     "fields": []
+    },
+    "SegmentedControl": {
+     "bases": [
+      "PyQt6.QtWidgets.QWidget"
+     ],
+     "methods": {
+      "__init__": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "items",
+        "kind": "positional_or_keyword",
+        "default": true
+       },
+       {
+        "name": "checked",
+        "kind": "positional_or_keyword",
+        "default": true
+       },
+       {
+        "name": "parent",
+        "kind": "positional_or_keyword",
+        "default": true
+       }
+      ],
+      "currentIndex": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ],
+      "setCurrentIndex": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "index",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ],
+      "setItems": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "items",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ]
+     },
+     "properties": [],
+     "signals": [
+      "currentChanged"
+     ],
+     "enum_members": {},
+     "fields": [],
+     "signal_signatures": {
+      "currentChanged": "currentChanged(int)"
+     }
+    },
+    "SearchField": {
+     "bases": [
+      "PyQt6.QtWidgets.QLineEdit"
+     ],
+     "methods": {
+      "__init__": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "placeholder",
+        "kind": "positional_or_keyword",
+        "default": true
+       },
+       {
+        "name": "parent",
+        "kind": "positional_or_keyword",
+        "default": true
+       }
+      ]
+     },
+     "properties": [],
+     "signals": [],
+     "enum_members": {},
+     "fields": []
+    },
+    "ChevronCombo": {
+     "bases": [
+      "PyQt6.QtWidgets.QComboBox"
+     ],
+     "methods": {},
+     "properties": [],
+     "signals": [],
+     "enum_members": {},
+     "fields": []
+    },
+    "Card": {
+     "bases": [
+      "PyQt6.QtWidgets.QFrame"
+     ],
+     "methods": {
+      "__init__": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "vertical",
+        "kind": "positional_or_keyword",
+        "default": true
+       },
+       {
+        "name": "margins",
+        "kind": "positional_or_keyword",
+        "default": true
+       },
+       {
+        "name": "spacing",
+        "kind": "positional_or_keyword",
+        "default": true
+       },
+       {
+        "name": "parent",
+        "kind": "positional_or_keyword",
+        "default": true
+       }
+      ]
+     },
+     "properties": [],
+     "signals": [],
+     "enum_members": {},
+     "fields": []
+    },
+    "Banner": {
+     "bases": [
+      "PyQt6.QtWidgets.QFrame"
+     ],
+     "methods": {
+      "__init__": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "tone",
+        "kind": "positional_or_keyword",
+        "default": true
+       },
+       {
+        "name": "text",
+        "kind": "positional_or_keyword",
+        "default": true
+       },
+       {
+        "name": "action_text",
+        "kind": "positional_or_keyword",
+        "default": true
+       },
+       {
+        "name": "closable",
+        "kind": "positional_or_keyword",
+        "default": true
+       },
+       {
+        "name": "parent",
+        "kind": "positional_or_keyword",
+        "default": true
+       }
+      ],
+      "setText": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "text",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ],
+      "setTone": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "tone",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ]
+     },
+     "properties": [],
+     "signals": [
+      "actionClicked",
+      "closed"
+     ],
+     "enum_members": {},
+     "fields": [],
+     "signal_signatures": {
+      "actionClicked": "actionClicked()",
+      "closed": "closed()"
+     }
+    },
+    "EmptyState": {
+     "bases": [
+      "PyQt6.QtWidgets.QWidget"
+     ],
+     "methods": {
+      "__init__": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "icon_name",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "title",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "hint",
+        "kind": "positional_or_keyword",
+        "default": true
+       },
+       {
+        "name": "actions",
+        "kind": "positional_or_keyword",
+        "default": true
+       },
+       {
+        "name": "tip_keys",
+        "kind": "positional_or_keyword",
+        "default": true
+       },
+       {
+        "name": "tip_text",
+        "kind": "positional_or_keyword",
+        "default": true
+       },
+       {
+        "name": "parent",
+        "kind": "positional_or_keyword",
+        "default": true
+       }
+      ]
+     },
+     "properties": [],
+     "signals": [],
+     "enum_members": {},
+     "fields": []
+    },
+    "Keycap": {
+     "bases": [
+      "PyQt6.QtWidgets.QLabel"
+     ],
+     "methods": {
+      "__init__": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "text",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "parent",
+        "kind": "positional_or_keyword",
+        "default": true
+       }
+      ]
+     },
+     "properties": [],
+     "signals": [],
+     "enum_members": {},
+     "fields": []
+    },
+    "StatusChip": {
+     "bases": [
+      "PyQt6.QtWidgets.QWidget"
+     ],
+     "methods": {
+      "__init__": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "status",
+        "kind": "positional_or_keyword",
+        "default": true
+       },
+       {
+        "name": "text",
+        "kind": "positional_or_keyword",
+        "default": true
+       },
+       {
+        "name": "parent",
+        "kind": "positional_or_keyword",
+        "default": true
+       }
+      ],
+      "setStatus": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "status",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "text",
+        "kind": "positional_or_keyword",
+        "default": true
+       }
+      ]
+     },
+     "properties": [],
+     "signals": [],
+     "enum_members": {},
+     "fields": []
+    },
+    "ProgressRing": {
+     "bases": [
+      "PyQt6.QtWidgets.QWidget"
+     ],
+     "methods": {
+      "__init__": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "size",
+        "kind": "positional_or_keyword",
+        "default": true
+       },
+       {
+        "name": "parent",
+        "kind": "positional_or_keyword",
+        "default": true
+       }
+      ],
+      "setProgress": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "done",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "total",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ],
+      "setTone": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "tone",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ]
+     },
+     "properties": [],
+     "signals": [],
+     "enum_members": {},
+     "fields": []
+    },
+    "Spinner": {
+     "bases": [
+      "PyQt6.QtWidgets.QWidget"
+     ],
+     "methods": {
+      "__init__": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "size",
+        "kind": "positional_or_keyword",
+        "default": true
+       },
+       {
+        "name": "parent",
+        "kind": "positional_or_keyword",
+        "default": true
+       }
+      ],
+      "start": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ],
+      "stop": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ]
+     },
+     "properties": [],
+     "signals": [],
+     "enum_members": {},
+     "fields": []
+    },
+    "Divider": {
+     "bases": [
+      "PyQt6.QtWidgets.QFrame"
+     ],
+     "methods": {
+      "__init__": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "vertical",
+        "kind": "positional_or_keyword",
+        "default": true
+       },
+       {
+        "name": "parent",
+        "kind": "positional_or_keyword",
+        "default": true
+       }
+      ]
+     },
+     "properties": [],
+     "signals": [],
+     "enum_members": {},
+     "fields": []
+    },
+    "ElidedLabel": {
+     "bases": [
+      "PyQt6.QtWidgets.QLabel"
+     ],
+     "methods": {},
+     "properties": [],
+     "signals": [],
+     "enum_members": {},
+     "fields": []
+    }
+   },
+   "constants": []
+  },
+  "autopress.ui.window_picker": {
+   "functions": {
+    "pick_target_window": [
+     {
+      "name": "ctx",
+      "kind": "positional_or_keyword",
+      "default": false
+     },
+     {
+      "name": "current",
+      "kind": "positional_or_keyword",
+      "default": true
+     },
+     {
+      "name": "parent",
+      "kind": "positional_or_keyword",
+      "default": true
+     }
+    ]
+   },
+   "classes": {
+    "WindowPickerDialog": {
+     "bases": [
+      "PyQt6.QtWidgets.QDialog"
+     ],
+     "methods": {
+      "__init__": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "ctx",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "current",
+        "kind": "positional_or_keyword",
+        "default": true
+       },
+       {
+        "name": "parent",
+        "kind": "positional_or_keyword",
+        "default": true
+       }
+      ],
+      "selected": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ]
+     },
+     "properties": [],
+     "signals": [],
+     "enum_members": {},
+     "fields": []
+    }
+   },
+   "constants": []
+  },
+  "autopress.win32": {
+   "functions": {},
+   "classes": {},
+   "constants": []
+  },
+  "autopress.win32.api": {
+   "functions": {},
+   "classes": {},
+   "constants": []
+  },
+  "autopress.win32.clipboard": {
+   "functions": {
+    "set_text": [
+     {
+      "name": "text",
+      "kind": "positional_or_keyword",
+      "default": false
+     },
+     {
+      "name": "hwnd",
+      "kind": "positional_or_keyword",
+      "default": true
+     },
+     {
+      "name": "private",
+      "kind": "positional_or_keyword",
+      "default": true
+     }
+    ],
+    "get_text": [
+     {
+      "name": "hwnd",
+      "kind": "positional_or_keyword",
+      "default": true
+     }
+    ],
+    "snapshot": [
+     {
+      "name": "hwnd",
+      "kind": "positional_or_keyword",
+      "default": true
+     }
+    ],
+    "restore": [
+     {
+      "name": "snap",
+      "kind": "positional_or_keyword",
+      "default": false
+     },
+     {
+      "name": "hwnd",
+      "kind": "positional_or_keyword",
+      "default": true
+     }
+    ]
+   },
+   "classes": {
+    "ClipboardSnapshot": {
+     "bases": [],
+     "methods": {},
+     "properties": [],
+     "signals": [],
+     "enum_members": {},
+     "fields": [
+      "formats"
+     ]
+    }
+   },
+   "constants": []
+  },
+  "autopress.win32.dpi": {
+   "functions": {
+    "process_awareness": [],
+    "ensure_per_monitor_v2": [],
+    "monitors": [],
+    "primary_monitor": [],
+    "monitor_at": [
+     {
+      "name": "x",
+      "kind": "positional_or_keyword",
+      "default": false
+     },
+     {
+      "name": "y",
+      "kind": "positional_or_keyword",
+      "default": false
+     }
+    ],
+    "virtual_screen": [],
+    "monitor_for_screen": [
+     {
+      "name": "screen",
+      "kind": "positional_or_keyword",
+      "default": false
+     }
+    ],
+    "screen_for_monitor": [
+     {
+      "name": "monitor",
+      "kind": "positional_or_keyword",
+      "default": false
+     }
+    ],
+    "screen_to_physical": [
+     {
+      "name": "screen",
+      "kind": "positional_or_keyword",
+      "default": false
+     },
+     {
+      "name": "p",
+      "kind": "positional_or_keyword",
+      "default": false
+     }
+    ],
+    "physical_to_screen": [
+     {
+      "name": "screen",
+      "kind": "positional_or_keyword",
+      "default": false
+     },
+     {
+      "name": "x",
+      "kind": "positional_or_keyword",
+      "default": false
+     },
+     {
+      "name": "y",
+      "kind": "positional_or_keyword",
+      "default": false
+     }
+    ],
+    "local_to_physical": [
+     {
+      "name": "screen",
+      "kind": "positional_or_keyword",
+      "default": false
+     },
+     {
+      "name": "local",
+      "kind": "positional_or_keyword",
+      "default": false
+     }
+    ],
+    "widget_to_physical": [
+     {
+      "name": "widget",
+      "kind": "positional_or_keyword",
+      "default": false
+     },
+     {
+      "name": "local",
+      "kind": "positional_or_keyword",
+      "default": false
+     }
+    ],
+    "cursor_physical": []
+   },
+   "classes": {},
+   "constants": []
+  },
+  "autopress.win32.elevation": {
+   "functions": {
+    "token_info": [
+     {
+      "name": "pid",
+      "kind": "positional_or_keyword",
+      "default": true
+     }
+    ],
+    "is_elevated": [],
+    "can_elevate": [],
+    "input_permission": [
+     {
+      "name": "hwnd",
+      "kind": "positional_or_keyword",
+      "default": false
+     }
+    ],
+    "restart_as_admin": [
+     {
+      "name": "argv",
+      "kind": "positional_or_keyword",
+      "default": true
+     }
+    ]
+   },
+   "classes": {
+    "InputPermission": {
+     "bases": [
+      "enum.StrEnum"
+     ],
+     "methods": {},
+     "properties": [],
+     "signals": [],
+     "enum_members": {
+      "OK": "ok",
+      "BLOCKED_ELEVATED": "blocked_elevated",
+      "UNKNOWN": "unknown"
+     },
+     "fields": []
+    },
+    "TokenInfo": {
+     "bases": [],
+     "methods": {},
+     "properties": [],
+     "signals": [],
+     "enum_members": {},
+     "fields": [
+      "pid",
+      "integrity_rid",
+      "elevated",
+      "elevation_type",
+      "uiaccess",
+      "error"
+     ]
+    }
+   },
+   "constants": []
+  },
+  "autopress.win32.hotkeys": {
+   "functions": {},
+   "classes": {
+    "HotkeyResult": {
+     "bases": [],
+     "methods": {},
+     "properties": [],
+     "signals": [],
+     "enum_members": {},
+     "fields": [
+      "ok",
+      "error",
+      "message"
+     ]
+    },
+    "GlobalHotkeys": {
+     "bases": [
+      "PyQt6.QtCore.QObject"
+     ],
+     "methods": {
+      "__init__": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "parent",
+        "kind": "positional_or_keyword",
+        "default": true
+       }
+      ],
+      "attach": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "hwnd",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ],
+      "register": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "action",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "combo",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ],
+      "unregister": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "action",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ],
+      "unregister_all": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ],
+      "registered": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       }
+      ]
+     },
+     "properties": [],
+     "signals": [
+      "triggered"
+     ],
+     "enum_members": {},
+     "fields": [],
+     "signal_signatures": {
+      "triggered": "triggered(QString)"
+     }
+    }
+   },
+   "constants": [
+    "ERROR_HOTKEY_ALREADY_REGISTERED"
+   ]
+  },
+  "autopress.win32.input": {
+   "functions": {
+    "bring_to_foreground": [
+     {
+      "name": "hwnd",
+      "kind": "positional_or_keyword",
+      "default": false
+     },
+     {
+      "name": "attempts",
+      "kind": "positional_or_keyword",
+      "default": true
+     },
+     {
+      "name": "verify_s",
+      "kind": "positional_or_keyword",
+      "default": true
+     },
+     {
+      "name": "sleep",
+      "kind": "positional_or_keyword",
+      "default": true
+     }
+    ],
+    "type_text": [
+     {
+      "name": "text",
+      "kind": "positional_or_keyword",
+      "default": false
+     },
+     {
+      "name": "guard",
+      "kind": "positional_or_keyword",
+      "default": false
+     },
+     {
+      "name": "mode",
+      "kind": "positional_or_keyword",
+      "default": true
+     },
+     {
+      "name": "key_delay_ms",
+      "kind": "keyword_only",
+      "default": true
+     },
+     {
+      "name": "hold_ms",
+      "kind": "keyword_only",
+      "default": true
+     },
+     {
+      "name": "close_ime",
+      "kind": "keyword_only",
+      "default": true
+     },
+     {
+      "name": "restore_clipboard_ms",
+      "kind": "keyword_only",
+      "default": true
+     },
+     {
+      "name": "sleep",
+      "kind": "keyword_only",
+      "default": true
+     }
+    ],
+    "press_keys": [
+     {
+      "name": "vks",
+      "kind": "positional_or_keyword",
+      "default": false
+     },
+     {
+      "name": "guard",
+      "kind": "positional_or_keyword",
+      "default": false
+     },
+     {
+      "name": "hold_ms",
+      "kind": "keyword_only",
+      "default": true
+     },
+     {
+      "name": "sleep",
+      "kind": "keyword_only",
+      "default": true
+     }
+    ],
+    "press_combo": [
+     {
+      "name": "combo",
+      "kind": "positional_or_keyword",
+      "default": false
+     },
+     {
+      "name": "guard",
+      "kind": "positional_or_keyword",
+      "default": false
+     },
+     {
+      "name": "repeat",
+      "kind": "keyword_only",
+      "default": true
+     },
+     {
+      "name": "interval_ms",
+      "kind": "keyword_only",
+      "default": true
+     },
+     {
+      "name": "hold_ms",
+      "kind": "keyword_only",
+      "default": true
+     },
+     {
+      "name": "sleep",
+      "kind": "keyword_only",
+      "default": true
+     }
+    ],
+    "clear_field": [
+     {
+      "name": "guard",
+      "kind": "positional_or_keyword",
+      "default": false
+     },
+     {
+      "name": "method",
+      "kind": "positional_or_keyword",
+      "default": true
+     },
+     {
+      "name": "backspaces",
+      "kind": "keyword_only",
+      "default": true
+     },
+     {
+      "name": "sleep",
+      "kind": "keyword_only",
+      "default": true
+     }
+    ],
+    "click": [
+     {
+      "name": "x",
+      "kind": "positional_or_keyword",
+      "default": false
+     },
+     {
+      "name": "y",
+      "kind": "positional_or_keyword",
+      "default": false
+     },
+     {
+      "name": "guard",
+      "kind": "positional_or_keyword",
+      "default": false
+     },
+     {
+      "name": "button",
+      "kind": "keyword_only",
+      "default": true
+     },
+     {
+      "name": "double",
+      "kind": "keyword_only",
+      "default": true
+     },
+     {
+      "name": "settle_ms",
+      "kind": "keyword_only",
+      "default": true
+     },
+     {
+      "name": "hold_ms",
+      "kind": "keyword_only",
+      "default": true
+     },
+     {
+      "name": "restore_cursor",
+      "kind": "keyword_only",
+      "default": true
+     },
+     {
+      "name": "sleep",
+      "kind": "keyword_only",
+      "default": true
+     }
+    ],
+    "release_all_modifiers": [
+     {
+      "name": "pressed_by_us",
+      "kind": "positional_or_keyword",
+      "default": true
+     }
+    ],
+    "last_injection_tick": [],
+    "reset_user_input_baseline": [],
+    "user_active_since_last_injection": [
+     {
+      "name": "slack_ms",
+      "kind": "positional_or_keyword",
+      "default": true
+     }
+    ],
+    "failsafe_triggered": [
+     {
+      "name": "margin_px",
+      "kind": "positional_or_keyword",
+      "default": true
+     }
+    ],
+    "ime_state": [
+     {
+      "name": "hwnd",
+      "kind": "positional_or_keyword",
+      "default": false
+     }
+    ],
+    "ime_set_open": [
+     {
+      "name": "hwnd",
+      "kind": "positional_or_keyword",
+      "default": false
+     },
+     {
+      "name": "is_open",
+      "kind": "positional_or_keyword",
+      "default": false
+     }
+    ]
+   },
+   "classes": {
+    "InjectionAborted": {
+     "bases": [
+      "builtins.RuntimeError"
+     ],
+     "methods": {},
+     "properties": [],
+     "signals": [],
+     "enum_members": {},
+     "fields": []
+    },
+    "ForegroundLost": {
+     "bases": [
+      "autopress.win32.input.InjectionAborted"
+     ],
+     "methods": {},
+     "properties": [],
+     "signals": [],
+     "enum_members": {},
+     "fields": []
+    },
+    "PointNotOnTarget": {
+     "bases": [
+      "autopress.win32.input.InjectionAborted"
+     ],
+     "methods": {},
+     "properties": [],
+     "signals": [],
+     "enum_members": {},
+     "fields": []
+    },
+    "UserActivity": {
+     "bases": [
+      "autopress.win32.input.InjectionAborted"
+     ],
+     "methods": {},
+     "properties": [],
+     "signals": [],
+     "enum_members": {},
+     "fields": []
+    },
+    "FailsafeTriggered": {
+     "bases": [
+      "autopress.win32.input.InjectionAborted"
+     ],
+     "methods": {},
+     "properties": [],
+     "signals": [],
+     "enum_members": {},
+     "fields": []
+    },
+    "InputBlocked": {
+     "bases": [
+      "autopress.win32.input.InjectionAborted"
+     ],
+     "methods": {},
+     "properties": [],
+     "signals": [],
+     "enum_members": {},
+     "fields": []
+    },
+    "ClipboardBusy": {
+     "bases": [
+      "builtins.OSError"
+     ],
+     "methods": {},
+     "properties": [],
+     "signals": [],
+     "enum_members": {},
+     "fields": []
+    },
+    "UnmappableChar": {
+     "bases": [
+      "builtins.ValueError"
+     ],
+     "methods": {},
+     "properties": [],
+     "signals": [],
+     "enum_members": {},
+     "fields": []
+    },
+    "InjectGuard": {
+     "bases": [],
+     "methods": {
+      "__init__": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "hwnd",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "pid",
+        "kind": "keyword_only",
+        "default": true
+       },
+       {
+        "name": "allow_same_process",
+        "kind": "keyword_only",
+        "default": true
+       },
+       {
+        "name": "check_user_input",
+        "kind": "keyword_only",
+        "default": true
+       },
+       {
+        "name": "slack_ms",
+        "kind": "keyword_only",
+        "default": true
+       },
+       {
+        "name": "failsafe",
+        "kind": "keyword_only",
+        "default": true
+       },
+       {
+        "name": "failsafe_margin_px",
+        "kind": "keyword_only",
+        "default": true
+       },
+       {
+        "name": "cancel",
+        "kind": "keyword_only",
+        "default": true
+       }
+      ],
+      "check": [
+       {
+        "name": "self",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "what",
+        "kind": "positional_or_keyword",
+        "default": false
+       },
+       {
+        "name": "point",
+        "kind": "positional_or_keyword",
+        "default": true
+       }
+      ]
+     },
+     "properties": [],
+     "signals": [],
+     "enum_members": {},
+     "fields": []
+    }
+   },
+   "constants": [
+    "EXTRA_TAG",
+    "Sleep"
+   ]
+  },
+  "autopress.win32.keys": {
+   "functions": {
+    "vk_for_name": [
+     {
+      "name": "name",
+      "kind": "positional_or_keyword",
+      "default": false
+     }
+    ],
+    "parse_combo": [
+     {
+      "name": "text",
+      "kind": "positional_or_keyword",
+      "default": false
+     }
+    ],
+    "parse_hotkey": [
+     {
+      "name": "text",
+      "kind": "positional_or_keyword",
+      "default": false
+     }
+    ],
+    "combo_from_qt": [
+     {
+      "name": "key",
+      "kind": "positional_or_keyword",
+      "default": false
+     },
+     {
+      "name": "modifiers",
+      "kind": "positional_or_keyword",
+      "default": false
+     }
+    ]
+   },
+   "classes": {},
+   "constants": [
+    "MOD_ALT",
+    "MOD_CONTROL",
+    "MOD_SHIFT",
+    "MOD_WIN",
+    "MOD_NOREPEAT",
+    "EXTENDED_VKS"
+   ]
+  },
+  "autopress.win32.power": {
+   "functions": {
+    "keep_awake": [
+     {
+      "name": "active",
+      "kind": "positional_or_keyword",
+      "default": false
+     }
+    ]
+   },
+   "classes": {},
+   "constants": []
+  },
+  "autopress.win32.windows": {
+   "functions": {
+    "list_windows": [
+     {
+      "name": "alt_tab_only",
+      "kind": "positional_or_keyword",
+      "default": true
+     }
+    ],
+    "window_info": [
+     {
+      "name": "hwnd",
+      "kind": "positional_or_keyword",
+      "default": false
+     }
+    ],
+    "window_at": [
+     {
+      "name": "x",
+      "kind": "positional_or_keyword",
+      "default": false
+     },
+     {
+      "name": "y",
+      "kind": "positional_or_keyword",
+      "default": false
+     },
+     {
+      "name": "skip_own",
+      "kind": "positional_or_keyword",
+      "default": true
+     }
+    ],
+    "exclude_from_capture": [
+     {
+      "name": "hwnd",
+      "kind": "positional_or_keyword",
+      "default": false
+     },
+     {
+      "name": "exclude",
+      "kind": "positional_or_keyword",
+      "default": true
+     }
+    ],
+    "client_rect": [
+     {
+      "name": "hwnd",
+      "kind": "positional_or_keyword",
+      "default": false
+     }
+    ],
+    "window_rect": [
+     {
+      "name": "hwnd",
+      "kind": "positional_or_keyword",
+      "default": false
+     }
+    ],
+    "frame_bounds": [
+     {
+      "name": "hwnd",
+      "kind": "positional_or_keyword",
+      "default": false
+     }
+    ],
+    "restored_rect": [
+     {
+      "name": "hwnd",
+      "kind": "positional_or_keyword",
+      "default": false
+     }
+    ],
+    "is_window": [
+     {
+      "name": "hwnd",
+      "kind": "positional_or_keyword",
+      "default": false
+     }
+    ],
+    "is_alive": [
+     {
+      "name": "info",
+      "kind": "positional_or_keyword",
+      "default": false
+     }
+    ],
+    "is_minimized": [
+     {
+      "name": "hwnd",
+      "kind": "positional_or_keyword",
+      "default": false
+     }
+    ],
+    "foreground_window": [],
+    "window_pid": [
+     {
+      "name": "hwnd",
+      "kind": "positional_or_keyword",
+      "default": false
+     }
+    ],
+    "is_own_window": [
+     {
+      "name": "hwnd",
+      "kind": "positional_or_keyword",
+      "default": false
+     }
+    ],
+    "find_windows": [
+     {
+      "name": "match",
+      "kind": "positional_or_keyword",
+      "default": false
+     }
+    ],
+    "find_window": [
+     {
+      "name": "match",
+      "kind": "positional_or_keyword",
+      "default": false
+     }
+    ],
+    "window_dpi": [
+     {
+      "name": "hwnd",
+      "kind": "positional_or_keyword",
+      "default": false
+     }
+    ]
+   },
+   "classes": {},
+   "constants": []
+  },
+  "main": {
+   "functions": {
+    "main": [
+     {
+      "name": "argv",
+      "kind": "positional_or_keyword",
+      "default": true
+     }
+    ]
+   },
+   "classes": {},
+   "constants": []
+  },
+  "tools.fake_redeem_app": {
+   "functions": {
+    "main": [
+     {
+      "name": "argv",
+      "kind": "positional_or_keyword",
+      "default": true
+     }
+    ]
+   },
+   "classes": {},
+   "constants": []
+  }
+ }
+}
