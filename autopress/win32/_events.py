@@ -7,8 +7,8 @@ Every injected event carries dwExtraInfo = EXTRA_TAG. ``_send`` raises InputBloc
 inserts fewer events than requested; keys / buttons a partially inserted batch left down are
 recorded, so release_all_modifiers() can let them go. ``_send`` also notes when it last inserted an
 ordinary key or a mouse-button event (not a KEYEVENTF_UNICODE character, not a bare move): UNICODE
-typing waits after those for targets with an IME (input.TEXT_AFTER_KEYS_SETTLE_S). State is shared
-by all threads (lock).
+typing waits after those when the target's thread has a default IME window, which is practically
+every window (input.TEXT_AFTER_KEYS_SETTLE_S). State is shared by all threads (lock).
 """
 
 from __future__ import annotations

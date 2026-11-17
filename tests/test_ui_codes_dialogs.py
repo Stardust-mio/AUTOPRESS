@@ -1,6 +1,6 @@
 # OWNED BY G6
 """PasteDialog (debounced extraction + summary, badges) and OcrReviewDialog with the
-FakeOcrService (loading, error, no codes, results, 已核對 / edits clear the flags) - SPEC 6.4.1,
+FakeOcrService (loading, error, no codes, results, 確認無誤 / edits clear the flags) - SPEC 6.4.1,
 8.2 G6."""
 
 from __future__ import annotations
@@ -146,7 +146,7 @@ def test_ocr_review_loading_then_results(ctx: Any, qtbot: Any) -> None:
     assert set(entries) == {"K8ZL0W3NBX5H", "MX4T9PK2JR7Z"}
     assert entries["K8ZL0W3NBX5H"].cand.flagged == [4] and entries["K8ZL0W3NBX5H"].needs_review
     assert entries["K8ZL0W3NBX5H"].crop is not None and not entries["K8ZL0W3NBX5H"].crop.isNull()
-    assert dlg._summary.text() == "將加入 2 筆，略過 0 筆重複、0 筆已兌換過（1 筆需要確認）"
+    assert dlg._summary.text() == "將加入 2 筆（1 筆需要確認）"  # skip parts with 0 are left out
     assert dlg._all_reviewed_btn.isVisibleTo(dlg)
     assert dlg._add_btn.isEnabled()
 

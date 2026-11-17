@@ -1,7 +1,7 @@
 # OWNED BY G5
-"""First-run welcome dialog (ux.md flow F1 step 1): what AutoPress does, the three rules (only
-your own codes; official web pages are safer; you are responsible for each game's terms),
-import profiles only from people you trust, language and theme choice, then "從範本建立設定檔"
+"""First-run welcome dialog (ux.md flow F1 step 1): what AutoPress does, four rules (only your
+own codes; official web pages are safer; you are responsible for each game's terms; import
+profiles only from people you trust), language and theme choice, then "從範本建立設定檔"
 (navigate to Profiles). ui.app shows it BEFORE MainWindow is built (parent None), so a language
 picked here applies at once: set_language + translator switch, no restart (PX-28).
 
@@ -87,10 +87,11 @@ class WelcomeDialog(QDialog):
         head.addStretch(1)
         lay.addLayout(head)
 
-        intro = label(tr("把手上的序號一次匯入，AutoPress 會照你設定的步驟，一筆接一筆自動輸入、送出，並記下每筆結果。"
+        # the lead-in to the rules gets its own line: wrapped CJK text may otherwise break inside a word
+        intro = label(tr("把手上的序號一次匯入，AutoPress 會照你設定的步驟，一筆接一筆自動輸入、送出，並記下每筆結果。\n"
                          "開始之前，請先看看這幾條原則：",
                          "Import your codes once and AutoPress types and submits them one by one, following the steps "
-                         "you set up, and records every result. Before you start, please read these rules:"),
+                         "you set up, and records every result.\nBefore you start, please read these rules:"),
                       "secondary")
         intro.setWordWrap(True)
         lay.addWidget(intro)
@@ -102,9 +103,8 @@ class WelcomeDialog(QDialog):
              tr("網頁兌換最安全、結果最清楚；遊戲內輸入只在沒有網頁時使用。",
                 "Web pages are the safest and clearest; use in-game entry only when there is no web page.")),
             ("shield", "warning", tr("各遊戲條款由你自己負責", "You are responsible for each game's terms"),
-             tr("模擬輸入是偵測得到的，有些遊戲禁止巨集；執行時你一動滑鼠或鍵盤就會暫停。",
-                "Simulated input can be detected and some games forbid macros; a run pauses as soon as you touch "
-                "the mouse or keyboard.")),
+             tr("模擬輸入是偵測得到的，有些遊戲禁止巨集；使用前請先確認該遊戲的規定。",
+                "Simulated input can be detected and some games forbid macros; check the game's rules first.")),
             ("profiles", "violet", tr("只匯入你信任的人分享的設定檔", "Import profiles only from people you trust"),
              tr("設定檔就是一串按鍵與點擊；匯入前會列出每個動作讓你確認。",
                 "A profile is a list of keystrokes and clicks; every action is listed for you before importing.")),

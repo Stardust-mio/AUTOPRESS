@@ -1,7 +1,12 @@
 # OWNED BY G7
 """Mini run bar (mock-up docs/research/ux/minibar_dark.png): r14 overlay with shadow, grip,
-ProgressRing, current code (mono), last result chips, 暫停 / 繼續 / 停止 buttons with keycaps,
-expand. Frameless | Tool | WindowStaysOnTopHint | WindowDoesNotAcceptFocus,
+ProgressRing (tooltip 「已處理 n / N 筆 · 預估剩餘 …」, the same count as the ring), current code
+(mono) with the running step - or the code's result once it has one - eliding into the free
+width, last result chips and the wait / cool-down / pause text (elided; full text in its
+tooltip), 暫停 / 繼續 / 停止 buttons with keycaps, expand. Fixed width ``bar_width()`` (BAR_W,
+BAR_W_EN in English; COMPACT_W in the one-line form). The chips show their words while they leave
+room for a wait text beside them; with more chips than that they show only their counts (the words
+in their tooltips), so the wait / pause text is not elided away (UI review U12, English). Frameless | Tool | WindowStaysOnTopHint | WindowDoesNotAcceptFocus,
 WA_ShowWithoutActivating: it never takes the foreground from the target. Draggable (Qt mouse
 events, not the native move loop); position saved in Settings.minibar_pos.
 
@@ -19,12 +24,12 @@ from __future__ import annotations
 import logging
 from collections.abc import Sequence
 
-from PyQt6.QtCore import QPoint, Qt, QTimer, pyqtSignal
-from PyQt6.QtGui import QColor
+from PyQt6.QtCore import QEvent, QObject, QPoint, Qt, QTimer, pyqtSignal
+from PyQt6.QtGui import QColor, QFontMetrics
 from PyQt6.QtWidgets import QFrame, QGraphicsDropShadowEffect, QHBoxLayout, QLabel, QVBoxLayout, QWidget
 
 from ..context import AppContext
-from ..i18n import format_duration, tr
+from ..i18n import format_duration, get_language, tr
 from ..models import CodeStatus, PauseReason, Rect, RunState
 from . import theme
 from . import widgets as w
@@ -37,13 +42,22 @@ from .overlays_geom import (
     screen_geoms,
     work_rects,
 )
+from .run_widgets import processed_text
 
 log = logging.getLogger(__name__)
 
+BAR_W = 660  # fixed width of the bar (logical px): state + 12-character code + a built-in step name fit
+BAR_W_EN = 720  # English words are longer: two result chips with their words and a wait text fit on line 2
+COMPACT_W = 470  # one-line form (no step, no chips) when nothing else is free
 BUTTON_LOCK_MS = 700  # pause / resume disabled after every state change (PX-11)
 SHADOW = (16, 10, 16, 22)  # transparent margins around the bar for the drop shadow (l, t, r, b)
 CHIP_ORDER = (CodeStatus.SUCCESS, CodeStatus.SUBMITTED, CodeStatus.USED, CodeStatus.INVALID, CodeStatus.EXPIRED,
               CodeStatus.COOLDOWN, CodeStatus.FAILED, CodeStatus.REVIEW, CodeStatus.SKIPPED)
+
+
+def bar_width() -> int:
+    """The bar's fixed width in the UI language."""
+    return BAR_W_EN if get_language() == "en" else BAR_W
 
 
 def pause_text(reason: str) -> str:
@@ -100,7 +114,7 @@ class MiniBar(QWidget):
         self.compact = False
         self._done = self._total = 0
         self._eta = -1.0
-        self._info = ""
+        self._info = self._info_tip = ""  # shown wait / cool-down text, its full form (tooltip)
         self._drag_from: QPoint | None = None
         self._drag_origin: QPoint | None = None
         self._lock = QTimer(self)
@@ -151,11 +165,11 @@ class MiniBar(QWidget):
         except Exception:
             pass
         line1.addWidget(self.code_label)
+        # the step takes all the width left on the line and elides there (full title in its tooltip)
         self.step_label = w.ElidedLabel("")
         self.step_label.setProperty("role", "muted")
-        self.step_label.setMaximumWidth(180)
-        line1.addWidget(self.step_label)
-        line1.addStretch(1)
+        line1.addWidget(self.step_label, 1)
+        line1.addStretch()  # stretch 0: takes the space only while the step is hidden (compact)
         text.addLayout(line1)
         self.line2 = QWidget()
         l2 = QHBoxLayout(self.line2)
@@ -167,10 +181,13 @@ class MiniBar(QWidget):
             chip.hide()
             l2.addWidget(chip)
             self.chips[st] = chip
-        self.info_label = w.label("", "muted")
-        l2.addWidget(self.info_label)
-        l2.addStretch(1)
+        # wait / cool-down / pause text after the chips: elided when they leave too little room
+        self.info_label = w.ElidedLabel("")
+        self.info_label.setProperty("role", "muted")
+        l2.addWidget(self.info_label, 1)
         text.addWidget(self.line2)
+        self.line2.installEventFilter(self)  # its width decides whether the chips keep their words
+        self.compact_chips = False
         b.addLayout(text, 1)
         hk = ctx.settings.hotkeys
         self.pause_btn = w.icon_button("pause", tr(f"暫停（{hk.pause_resume}）", f"Pause ({hk.pause_resume})"), "icon")
@@ -189,7 +206,7 @@ class MiniBar(QWidget):
         self.expand_btn.clicked.connect(self.expandClicked.emit)
         b.addWidget(self.expand_btn, 0, Qt.AlignmentFlag.AlignVCenter)
         self.setToolTip(self.failsafe_hint())
-        self.setFixedWidth(600)
+        self.setFixedWidth(bar_width())
         self._refresh()
 
     # -- API ------------------------------------------------------------------------------
@@ -202,8 +219,10 @@ class MiniBar(QWidget):
     def set_progress(self, done: int, total: int, eta_s: float) -> None:
         self._done, self._total, self._eta = int(done), int(total), float(eta_s)
         self.ring.setProgress(self._done, self._total)
-        self.ring.setToolTip(tr(f"第 {min(done + 1, total)} / {total} 筆 · 預估剩餘 {format_duration(eta_s if eta_s >= 0 else None)}",
-                                f"Code {min(done + 1, total)} of {total} · about {format_duration(eta_s if eta_s >= 0 else None)} left"))
+        # the ring's own number in words (as on the Run page), never "code done + 1"
+        eta = format_duration(eta_s if eta_s >= 0 else None)
+        self.ring.setToolTip(tr("{done} · 預估剩餘 {eta}", "{done} · about {eta} left").format(
+            done=processed_text(self._done, self._total), eta=eta))
 
     def set_current(self, code: str, step_title: str = "") -> None:
         self.code_label.setText(code)
@@ -212,7 +231,7 @@ class MiniBar(QWidget):
 
     def set_state(self, state: str, reason: str = "") -> None:
         self.state, self.reason = str(state), str(reason or "")
-        self._info = ""
+        self._info = self._info_tip = ""
         self.pause_btn.setEnabled(False)  # never flip under the user's hand
         self._lock.start(BUTTON_LOCK_MS)
         self._refresh()
@@ -220,34 +239,40 @@ class MiniBar(QWidget):
     def add_result(self, status: CodeStatus) -> None:
         st = CodeStatus(status)
         self.counts[st] = self.counts.get(st, 0) + 1
-        chip = self.chips.get(st)
-        if chip is not None:
-            chip.setStatus(st, f"{st.label()} {self.counts[st]}")
-            chip.show()
+        self._update_chips()
+
+    def set_counts(self, counts: dict[CodeStatus, int]) -> None:
+        """Replace every result count (RunFlow: one result per code, so a result the user picked
+        in a decision moves the code from 需確認 to that status instead of adding a second one)."""
+        self.counts = {CodeStatus(st): int(n) for st, n in counts.items() if n}
+        self._update_chips()
 
     def reset(self) -> None:
         self.counts.clear()
-        for chip in self.chips.values():
-            chip.hide()
+        self._update_chips()
         self.set_current("")
-        self._info = ""
+        self._info = self._info_tip = ""
         self.set_progress(0, 0, -1.0)
 
     def set_waiting(self, seconds_left: float) -> None:
         self._info = tr(f"· 下一筆 {max(0, round(seconds_left))} 秒後", f"· next code in {max(0, round(seconds_left))} s") \
             if seconds_left > 0 else ""
+        self._info_tip = self._info.removeprefix("· ")
         self._refresh()
 
     def set_cooldown(self, seconds_left: float) -> None:
         s = max(0, round(seconds_left))
-        self._info = tr(f"· 偵測到「操作過於頻繁」，{s} 秒後重試", f"· rate limit: retrying in {s} s") if s > 0 else ""
+        # short: the line is shared with the result chips and the state already says 冷卻中; the
+        # cause is in the tooltip
+        self._info = tr(f"· {s} 秒後重試", f"· retrying in {s} s") if s > 0 else ""
+        self._info_tip = tr(f"偵測到「操作過於頻繁」，{s} 秒後重試", f"Rate limit detected; retrying in {s} s") if s > 0 else ""
         self._refresh()
 
     def set_compact(self, compact: bool) -> None:
         self.compact = bool(compact)
         self.line2.setVisible(not self.compact)
         self.step_label.setVisible(not self.compact)
-        self.setFixedWidth(470 if self.compact else 600)
+        self.setFixedWidth(COMPACT_W if self.compact else bar_width())
         self.adjustSize()
 
     def info_text(self) -> str:
@@ -256,7 +281,7 @@ class MiniBar(QWidget):
     # -- placement ------------------------------------------------------------------------
     def bar_size_physical(self, compact: bool = False) -> tuple[int, int]:
         hint = self.sizeHint()
-        width = 470 if compact else max(self.width(), 600)
+        width = COMPACT_W if compact else max(self.width(), bar_width())
         height = hint.height() - (24 if compact else 0)
         dpr = max([g.dpr for g in screen_geoms()] or [1.0])
         return qround(width * dpr), qround(max(40, height) * dpr)
@@ -314,6 +339,35 @@ class MiniBar(QWidget):
         self.placed_at = (px, py)
 
     # -- internals ------------------------------------------------------------------------
+    def _update_chips(self) -> None:
+        """One chip per result with a count. With their words they must leave room on line 2 for a
+        wait text (「· 下一筆 6 秒後」) - and while paused for the whole pause reason; with more chips
+        than that they show only their counts and keep the words in their tooltips, so the text beside
+        them stays readable. A wait does not count its own text, so the chips do not change at every
+        wait between codes."""
+        shown = [(st, self.counts[st]) for st in CHIP_ORDER if self.counts.get(st, 0) > 0]
+        spacing = max(0, self.line2.layout().spacing())
+        words = sum(w.status_chip_width(st, f"{st.label()} {n}") for st, n in shown) + spacing * len(shown)
+        fm = QFontMetrics(self.info_label.font())
+        reserve = fm.horizontalAdvance(tr("· 下一筆 6 秒後", "· next code in 6 s"))
+        if self.state == RunState.PAUSED.value and self.info_label.text():
+            reserve = max(reserve, fm.horizontalAdvance(self.info_label.text()))  # why it paused, in full
+        room = self.line2.width() - reserve
+        # line 2 has its real width only once the bar is laid out (shown); until then the words stay
+        self.compact_chips = bool(shown) and self.line2.isVisible() and words > room
+        for st, chip in self.chips.items():
+            n = self.counts.get(st, 0)
+            full = f"{st.label()} {n}"
+            chip.setStatus(st, str(n) if self.compact_chips else full)
+            chip.setAccessibleName(full)
+            chip.setToolTip(full if self.compact_chips else "")
+            chip.setVisible(n > 0)
+
+    def eventFilter(self, obj: QObject | None, event: QEvent | None) -> bool:
+        if obj is self.line2 and event is not None and event.type() in (QEvent.Type.Resize, QEvent.Type.Show):
+            self._update_chips()
+        return super().eventFilter(obj, event)
+
     def _unlock(self) -> None:
         self.pause_btn.setEnabled(self.state in (RunState.RUNNING.value, RunState.PAUSED.value,
                                                  RunState.COOLDOWN.value, RunState.PAUSING.value))
@@ -321,13 +375,10 @@ class MiniBar(QWidget):
     def _refresh(self) -> None:
         st = self.state
         paused = st == RunState.PAUSED.value
-        labels = {
-            RunState.IDLE.value: tr("待命", "Idle"), RunState.STARTING.value: tr("準備中", "Starting"),
-            RunState.RUNNING.value: tr("正在兌換", "Redeeming"), RunState.PAUSING.value: tr("即將暫停", "Pausing"),
-            RunState.PAUSED.value: tr("已暫停", "Paused"), RunState.COOLDOWN.value: tr("冷卻中", "Cooling down"),
-            RunState.STOPPING.value: tr("正在停止", "Stopping"), RunState.FINISHED.value: tr("已結束", "Finished"),
-        }
-        self.state_label.setText(labels.get(st, st))
+        try:  # the same words as the Run page (「執行中」, not a second word for the running state)
+            self.state_label.setText(RunState(st).label())
+        except ValueError:
+            self.state_label.setText(st)
         hk = self.ctx.settings.hotkeys
         if paused:
             self.pause_btn.setToolTip(tr(f"繼續（{hk.pause_resume}）", f"Resume ({hk.pause_resume})"))
@@ -344,10 +395,13 @@ class MiniBar(QWidget):
             except ValueError:
                 label = self.reason
             info = f"· {label}"
-            self.info_label.setToolTip(pause_text(self.reason) + "\n" + self.failsafe_hint())
+            full = pause_text(self.reason)
         else:
-            self.info_label.setToolTip(self.failsafe_hint())
+            full = self._info_tip if info else ""  # the whole wait / cool-down text, even when elided
+        hint = self.failsafe_hint()
+        self.info_label.setToolTip(f"{full}\n{hint}" if full else hint)
         self.info_label.setText(info)
+        self._update_chips()
 
     # -- dragging (Qt mouse events; the bar never activates) --------------------------------
     def mousePressEvent(self, event) -> None:  # noqa: N802

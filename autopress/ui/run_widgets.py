@@ -1,23 +1,29 @@
 # OWNED BY G7
 """Parts of the Run page (private helper of ui.run_page): the live log, the running card, the
-attention panel and the finished summary card."""
+attention panel and the finished summary card.
+
+One count everywhere: the progress ring, the running card's heading, the ring tooltips (Run page
+and mini bar) and the summary say how many codes were processed (``processed_text``); the
+position of the code being worked on (「第 i / N 筆」) comes from RunSession.code_started and is
+shown next to that code."""
 
 from __future__ import annotations
 
 import logging
+import math
 from collections.abc import Callable
 from pathlib import Path
 
-from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtGui import QColor, QPixmap
+from PyQt6.QtCore import QEvent, QRectF, QSize, Qt, pyqtSignal
+from PyQt6.QtGui import QColor, QPainter, QPaintEvent, QPalette, QPixmap
 from PyQt6.QtWidgets import (
     QComboBox,
     QDialog,
     QHBoxLayout,
-    QLabel,
     QLineEdit,
     QListWidget,
     QListWidgetItem,
+    QSizePolicy,
     QVBoxLayout,
     QWidget,
 )
@@ -32,6 +38,7 @@ from ..models import (
     ResultClass,
     RunState,
     RunSummary,
+    StopReason,
 )
 from . import theme
 from . import widgets as w
@@ -42,10 +49,31 @@ MAX_LOG = 2000
 MARK_STATUSES = (CodeStatus.SUCCESS, CodeStatus.USED, CodeStatus.INVALID, CodeStatus.EXPIRED, CodeStatus.FAILED)
 COUNT_ORDER = (CodeStatus.SUCCESS, CodeStatus.SUBMITTED, CodeStatus.USED, CodeStatus.INVALID, CodeStatus.EXPIRED,
                CodeStatus.COOLDOWN, CodeStatus.FAILED, CodeStatus.REVIEW, CodeStatus.SKIPPED, CodeStatus.PENDING)
+# stop reasons whose runner message only repeats the summary title (「全部完成，共 4 筆。」 under
+# 「執行結束：全部完成」); the other messages carry advice or the error text
+_REASON_IN_TITLE = (StopReason.COMPLETED, StopReason.USER, StopReason.FAILSAFE)
 
 
 def level_glyph(level: LogLevel) -> str:
     return {LogLevel.INFO: "·", LogLevel.SUCCESS: "✓", LogLevel.WARNING: "!", LogLevel.ERROR: "✕"}.get(level, "·")
+
+
+def processed_text(done: int, total: int) -> str:
+    """「已處理 2 / 4 筆」: the number the progress ring shows, in the same words wherever it
+    appears (running card heading, ring tooltips, summary)."""
+    return tr("已處理 {done} / {total} 筆", "{done} of {total} processed").format(done=int(done), total=int(total))
+
+
+def position_text(index: int, total: int) -> str:
+    """「第 3 / 4 筆」 for the 0-based plan ``index`` of the code being processed."""
+    if total > 0:
+        return tr("第 {i} / {n} 筆", "Code {i} of {n}").format(i=index + 1, n=total)
+    return tr("第 {i} 筆", "Code {i}").format(i=index + 1)
+
+
+def result_text(status: CodeStatus) -> str:
+    """「結果：成功」: replaces the step line once a code has its result (no step is running)."""
+    return tr("結果：{label}", "Result: {label}").format(label=status.label())
 
 
 def _tone_color(tone: str) -> QColor:
@@ -55,15 +83,51 @@ def _tone_color(tone: str) -> QColor:
         return QColor()
 
 
+def _tone_token(token: str) -> QColor:
+    """A theme colour token at paint time (an invalid QColor when the theme cannot answer)."""
+    try:
+        return QColor(theme.color(token))
+    except Exception:
+        return QColor()
+
+
 class LogView(QListWidget):
-    """Live log: time, level glyph, message; auto-scrolls while the view is at the bottom."""
+    """Live log: time, level glyph, message; auto-scrolls while the view is at the bottom. While
+    it is empty a muted line says what will appear here."""
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setAccessibleName(tr("即時紀錄", "Live log"))
+        self.setAccessibleDescription(self.placeholder_text())
         self.setUniformItemSizes(True)
         self.setWordWrap(False)
         self.setMinimumHeight(160)
+
+    @staticmethod
+    def placeholder_text() -> str:
+        return tr("按「開始兌換」或「測試一筆」後，每一筆序號的處理過程和結果會顯示在這裡。",
+                  "After you press Start or Test one, the progress and result of every code appear here.")
+
+    def placeholder_visible(self) -> bool:
+        return self.count() == 0
+
+    def paintEvent(self, event) -> None:  # noqa: N802 (Qt override; paints the viewport)
+        super().paintEvent(event)
+        if not self.placeholder_visible():
+            return
+        p = QPainter(self.viewport())
+        try:
+            # the theme's muted text colour: under the style sheet the palette's placeholder role is the
+            # text colour at half opacity (about 3.4:1 on the light card)
+            muted = _tone_token("text_muted")
+            p.setPen(muted if muted.isValid() else self.palette().color(QPalette.ColorRole.PlaceholderText))
+            p.setFont(self.font())
+            # roughly where the first row's text would start (item padding 6 px + frame)
+            rect = self.viewport().rect().adjusted(9, 6, -9, -6)
+            p.drawText(rect, int(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop) | int(Qt.TextFlag.TextWordWrap),
+                       self.placeholder_text())
+        finally:
+            p.end()
 
     def add_entry(self, entry: LogEntry) -> None:
         at_bottom = self.verticalScrollBar().value() >= self.verticalScrollBar().maximum() - 4
@@ -116,13 +180,17 @@ class CountsRow(QWidget):
 
 
 class RunningCard(QWidget):
-    """Progress while a run is active: ring, n / N, ETA, current code and step, state, buttons."""
+    """Progress while a run is active: ring and heading with the same count (「已處理 n / N 筆」),
+    ETA, the code being processed with its position (「第 i / N 筆」) and step - or its result
+    once it has one - state, buttons."""
 
     pauseClicked = pyqtSignal()
     stopClicked = pyqtSignal()
 
     def __init__(self, pause_key: str, stop_key: str, parent: QWidget | None = None) -> None:
         super().__init__(parent)
+        self.total = 0
+        self.current_index = -1  # 0-based plan index of the code being processed (-1: none yet)
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
         c = w.Card(True, None, 10)
@@ -144,6 +212,8 @@ class RunningCard(QWidget):
         self.eta = w.label("", "secondary")
         col.addWidget(self.eta)
         row2 = QHBoxLayout()
+        self.index = w.label("", "secondary")
+        row2.addWidget(self.index)
         self.code = w.label("", "mono")
         try:
             self.code.setFont(theme.font(theme.FS_MONO, mono=True))
@@ -165,17 +235,50 @@ class RunningCard(QWidget):
         self.stop_key = w.Keycap(stop_key)
         top.addWidget(self.stop_key)
         lay.addLayout(top)
+        # the chips and the info line (「下一筆 6 秒後」, the cool-down) share one row: an empty info line
+        # of its own left a band of padding at the bottom of the card, and hiding it made the card jump
+        bottom = QHBoxLayout()
+        bottom.setSpacing(12)
         self.counts = CountsRow()
-        lay.addWidget(self.counts)
+        bottom.addWidget(self.counts, 1)
         self.info = w.label("", "muted")
-        lay.addWidget(self.info)
+        bottom.addWidget(self.info, 0, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        lay.addLayout(bottom)
 
     def set_progress(self, done: int, total: int, eta: float) -> None:
+        self.total = max(0, int(total))
         self.ring.setProgress(done, total)
-        i = min(done + 1, total) if total else 0
-        self.position.setText(tr(f"第 {i} / {total} 筆", f"Code {i} of {total}"))
+        text = processed_text(done, total)  # the ring's number, in words
+        self.position.setText(text)
+        self.ring.setToolTip(text)
         self.eta.setText(tr(f"預估剩餘 {format_duration(eta if eta >= 0 else None)}",
                             f"About {format_duration(eta if eta >= 0 else None)} left"))
+        self._show_position()
+
+    def set_current(self, index: int, code: str, total: int | None = None) -> None:
+        """The code being processed: its 0-based plan ``index`` (RunSession.code_started) and
+        text; ``total`` = plan size when known (else the last progress total)."""
+        if total is not None and total > 0:
+            self.total = int(total)
+        self.current_index = int(index)
+        self.code.setText(code)
+        self._show_position()
+
+    def _show_position(self) -> None:
+        self.index.setText(position_text(self.current_index, self.total) if self.current_index >= 0 else "")
+
+    def reset(self) -> None:
+        """A new run: nothing of the previous run's code, step, result chips or info line."""
+        self.current_index = -1
+        for lb in (self.index, self.code, self.step, self.info):
+            lb.setText("")
+        self.counts.set_counts({})
+
+    def set_controls_visible(self, visible: bool) -> None:
+        """Pause / stop and their keycaps; hidden while the decision card (which has its own
+        繼續 / 停止) is shown. F8 / F9 keep working."""
+        for widget in (self.pause_btn, self.pause_key, self.stop_btn, self.stop_key):
+            widget.setVisible(visible)
 
     def set_state(self, state: str) -> None:
         try:
@@ -191,8 +294,78 @@ class RunningCard(QWidget):
         bind_icon(self.pause_btn, "play" if paused else "pause", "text_secondary")
 
 
+class EvidenceView(QWidget):
+    """The evidence crop on the decision card, like the history's evidence viewer: inside a 1 px
+    frame (a white crop on the white light card would look like part of AutoPress's own UI) and
+    at its natural size - one image pixel per screen pixel, as large as it was on screen and sharp
+    at any Windows scaling - shrunk only to fit MAX_H and the card's width."""
+
+    MAX_H = 160  # logical px
+    FRAME = 1
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self._pixmap = QPixmap()
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.setAccessibleName(tr("證據圖片", "Evidence image"))
+
+    def setPixmap(self, pixmap: QPixmap) -> None:  # noqa: N802 (QLabel-like)
+        self._pixmap = QPixmap(pixmap)
+        self.updateGeometry()
+        self.update()
+
+    def pixmap(self) -> QPixmap:
+        return self._pixmap
+
+    def clear(self) -> None:
+        self.setPixmap(QPixmap())
+
+    def image_rect(self, width: float | None = None) -> QRectF:
+        """Where the crop is drawn (inside the frame) for a widget ``width`` logical px wide."""
+        if self._pixmap.isNull():
+            return QRectF()
+        dpr = self.devicePixelRatioF() or 1.0
+        nw, nh = self._pixmap.width() / dpr, self._pixmap.height() / dpr
+        avail_w = (self.width() if width is None else width) - 2 * self.FRAME
+        s = min(1.0, (self.MAX_H - 2 * self.FRAME) / max(1.0, nh), max(1.0, avail_w) / max(1.0, nw))
+        return QRectF(self.FRAME, self.FRAME, nw * s, nh * s)
+
+    def hasHeightForWidth(self) -> bool:  # noqa: N802
+        return not self._pixmap.isNull()
+
+    def heightForWidth(self, width: int) -> int:  # noqa: N802
+        return math.ceil(self.image_rect(width).height()) + 2 * self.FRAME if not self._pixmap.isNull() else 0
+
+    def sizeHint(self) -> QSize:  # noqa: N802
+        if self._pixmap.isNull():
+            return QSize(0, 0)
+        r = self.image_rect(1e6)
+        return QSize(math.ceil(r.width()) + 2 * self.FRAME, math.ceil(r.height()) + 2 * self.FRAME)
+
+    def minimumSizeHint(self) -> QSize:  # noqa: N802
+        return QSize(0, 0)
+
+    def event(self, event: QEvent | None) -> bool:
+        if event is not None and event.type() == QEvent.Type.DevicePixelRatioChange:
+            self.updateGeometry()  # another screen scaling: another natural size
+        return super().event(event)
+
+    def paintEvent(self, _event: QPaintEvent | None) -> None:  # noqa: N802
+        r = self.image_rect()
+        if r.isEmpty():
+            return
+        p = QPainter(self)
+        f = self.FRAME
+        p.fillRect(r.adjusted(-f, -f, f, f), _tone_token("border_strong"))
+        natural = abs(r.width() * (self.devicePixelRatioF() or 1.0) - self._pixmap.width()) < 0.5
+        p.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform, not natural)  # a 1:1 copy needs no filter
+        p.drawPixmap(r, self._pixmap, QRectF(self._pixmap.rect()))
+        p.end()
+
+
 class AttentionPanel(QWidget):
-    """Shown when a paused run needs a decision (SPEC 6.4.3)."""
+    """Shown when a paused run needs a decision (SPEC 6.4.3): reason, the code it is about,
+    what to do, the text that was read, evidence, 標記為…, 加入關鍵字…, 繼續 / 停止."""
 
     markClicked = pyqtSignal(object)  # CodeStatus
     addKeywordClicked = pyqtSignal()
@@ -213,6 +386,21 @@ class AttentionPanel(QWidget):
         lay = c.layout()
         self.title = w.label("", "title")
         lay.addWidget(self.title)
+        self.code_row = QWidget()
+        cr = QHBoxLayout(self.code_row)
+        cr.setContentsMargins(0, 0, 0, 0)
+        cr.setSpacing(8)
+        cr.addWidget(w.label(tr("序號", "Code"), "secondary"))
+        self.code = w.label("", "mono")
+        try:
+            self.code.setFont(theme.font(theme.FS_MONO, mono=True))
+        except Exception:
+            pass
+        self.code.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        cr.addWidget(self.code)
+        cr.addStretch(1)
+        self.code_row.hide()
+        lay.addWidget(self.code_row)
         self.message = w.label("", "body")
         self.message.setWordWrap(True)
         lay.addWidget(self.message)
@@ -222,9 +410,7 @@ class AttentionPanel(QWidget):
         self.ocr_text.setWordWrap(True)
         self.ocr_text.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         lay.addWidget(self.ocr_text)
-        self.evidence = QLabel()
-        self.evidence.setMaximumHeight(160)
-        self.evidence.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        self.evidence = EvidenceView()
         lay.addWidget(self.evidence)
         self.mark_row = QWidget()
         mr = QHBoxLayout(self.mark_row)
@@ -257,13 +443,23 @@ class AttentionPanel(QWidget):
         row.addWidget(self.resume_btn)
         lay.addLayout(row)
 
-    def show_attention(self, att: Attention) -> None:
+    def show_attention(self, att: Attention, code: str = "") -> None:
+        """``code`` = the text of the code ``att.code_id`` refers to ("" hides the code line)."""
         self.attention = att
         kind = PauseReason(att.kind)
         self.title.setText(kind.label())
+        self.code.setText(code)
+        self.code_row.setVisible(bool(code))
         unknown = kind is PauseReason.UNKNOWN_RESULT
+        decide = unknown and bool(att.code_id)  # the 標記為 buttons are shown
         text = att.message
-        if unknown and att.ocr_text and not text:
+        if decide and att.ocr_text:
+            # the runner's message quotes the text that is shown right below: say what to do instead
+            text = tr("請選擇這筆序號的結果，或把讀到的文字加入關鍵字。",
+                      "Choose the result for this code, or add the text that was read as a keyword.")
+        elif decide and not text:
+            text = tr("請選擇這筆序號的結果。", "Choose the result for this code.")
+        elif unknown and att.ocr_text and not text:
             text = tr(f"無法判讀結果：「{att.ocr_text}」。請選擇結果，或把文字加入關鍵字。",
                       f"Could not recognise the result: \"{att.ocr_text}\". Pick the result or add the text as a keyword.")
         self.message.setText(text)
@@ -291,8 +487,8 @@ class AttentionPanel(QWidget):
             return
         pm = QPixmap(str(path))
         if not pm.isNull():
-            self.evidence.setPixmap(pm.scaledToHeight(min(160, pm.height()), Qt.TransformationMode.SmoothTransformation))
-            self.evidence.setToolTip(str(path))
+            # no tooltip with the file's path: it names the Windows account folder (screen recordings)
+            self.evidence.setPixmap(pm)
             self.evidence.show()
 
     def mark_resolved(self, status: CodeStatus) -> None:
@@ -335,9 +531,9 @@ class SummaryCard(QWidget):
     def show_summary(self, summary: RunSummary, counts: dict[CodeStatus, int]) -> None:
         self.summary = summary
         self.title.setText(tr("執行結束：", "Run finished: ") + summary.stop_reason.label())
-        lines = [tr(f"「{summary.profile_name}」完成 {summary.done} / {summary.total} 筆",
-                    f"'{summary.profile_name}': {summary.done} of {summary.total} codes done")]
-        if summary.message:
+        lines = [tr("「{name}」已處理 {done} / {total} 筆", "'{name}': {done} of {total} codes processed").format(
+            name=summary.profile_name, done=summary.done, total=summary.total)]
+        if summary.message and summary.stop_reason not in _REASON_IN_TITLE:
             lines.append(summary.message)
         self.detail.setText("\n".join(lines))
         self.counts.set_counts(counts)
@@ -393,4 +589,5 @@ class KeywordDialog(QDialog):
         return clean_text(self.edit.text()).strip()
 
 
-__all__ = ["AttentionPanel", "CountsRow", "KeywordDialog", "LogView", "RunningCard", "SummaryCard", "level_glyph"]
+__all__ = ["AttentionPanel", "CountsRow", "EvidenceView", "KeywordDialog", "LogView", "RunningCard", "SummaryCard",
+           "level_glyph", "position_text", "processed_text", "result_text"]

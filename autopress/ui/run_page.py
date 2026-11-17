@@ -2,11 +2,16 @@
 """Run page (SPEC section 6.4.3): active profile, target window (change / refresh), selection
 (全部未完成 / 只跑勾選的), preflight issue list with action buttons (restart_admin, pick_window,
 preview, open_profile, wait_ocr, assign_codes, test_one, realign), 開始兌換 / 測試一筆 /
-預覽點位; while running: ProgressRing, n / N, ETA, current code and step, state chip,
-暫停／繼續 (F8) and 停止 (F9) with keycaps, live log, result counts; attention panel (shown when
-RunFlow restores the main window for a paused run): reason, OCR text, evidence, 標記為…,
-加入關鍵字…, 開啟紀錄檔 (errors), 繼續 (RunFlow.resume: countdown) / 停止; finished summary with
-匯出結果 and 重試失敗項目."""
+預覽點位; while running: ProgressRing with the same count as the heading (「已處理 n / N 筆」),
+ETA, the current code with its position (「第 i / N 筆」 from code_started) and step (its
+result once it has one), state chip, 暫停／繼續 (F8) and 停止 (F9) with keycaps, live log, result
+counts; the setup card is locked during a run; attention panel (shown when RunFlow restores the
+main window for a paused run): reason, the code it is about, OCR text, evidence, 標記為…,
+加入關鍵字…, 開啟紀錄檔 (errors), 繼續 (RunFlow.resume: countdown) / 停止 - the running card hides
+its own pause / stop meanwhile; finished summary with 匯出結果 and 重試失敗項目.
+
+The target line and the preflight list agree: the line is refreshed whenever the page is shown
+and synced with the window lookup of every preflight report."""
 
 from __future__ import annotations
 
@@ -14,7 +19,7 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from PyQt6.QtCore import QTimer, QUrl
+from PyQt6.QtCore import Qt, QTimer, QUrl
 from PyQt6.QtGui import QDesktopServices, QKeySequence, QShortcut
 from PyQt6.QtWidgets import QComboBox, QDialog, QFileDialog, QHBoxLayout, QScrollArea, QVBoxLayout, QWidget
 
@@ -24,6 +29,7 @@ from ..i18n import format_count, tr
 from ..models import (
     Attention,
     CodeStatus,
+    IssueLevel,
     LogEntry,
     LogLevel,
     PlanMode,
@@ -32,6 +38,7 @@ from ..models import (
     RunState,
     RunSummary,
     StepTestResult,
+    WindowInfo,
     status_for_result,
 )
 from . import widgets as w
@@ -46,9 +53,25 @@ from .run_actions import (
     show_preview,
 )
 from .run_sheet import IssueList
-from .run_widgets import AttentionPanel, KeywordDialog, LogView, RunningCard, SummaryCard
+from .run_widgets import AttentionPanel, KeywordDialog, LogView, RunningCard, SummaryCard, result_text
 
 log = logging.getLogger(__name__)
+
+_IDLE_STATES = (RunState.IDLE.value, RunState.FINISHED.value)
+
+
+def _run_lock_text() -> str:
+    return tr("執行中無法變更設定，要變更請先停止。", "Settings are locked during a run; stop it to change them.")
+
+
+def _blocking_text(n: int) -> str:
+    """Hint and 開始兌換 tooltip while the preflight has ``n`` errors (SPEC 2.4: the sheet that
+    開始兌換 opens checks again and blocks; problems fixed outside AutoPress are picked up)."""
+    if n == 1:
+        return tr("有 1 個問題必須先處理（標示 ✕ 的項目）；按「開始兌換」會再檢查一次。",
+                  "1 problem must be fixed first (marked ✕); Start checks again.")
+    return tr("有 {n} 個問題必須先處理（標示 ✕ 的項目）；按「開始兌換」會再檢查一次。",
+              "{n} problems must be fixed first (marked ✕); Start checks again.").format(n=n)
 
 
 def ask_csv_path(parent: QWidget | None, default_name: str) -> str:
@@ -66,6 +89,7 @@ class RunPage(QWidget):
         self._report: Any = None
         self._summary: RunSummary | None = None
         self._run_counts: dict[CodeStatus, int] = {}
+        self._results: dict[str, CodeStatus] = {}  # code id -> its result in the current run
         self._run_id = ""
         self._state = RunState.IDLE.value
         self._recheck_timer = QTimer(self)
@@ -115,6 +139,7 @@ class RunPage(QWidget):
         pl.addWidget(self.issues)
         self.preflight_empty = w.label("", "muted")
         self.preflight_empty.setWordWrap(True)
+        self.preflight_empty.hide()  # takes no space while empty (it left a band under the last item)
         pl.addWidget(self.preflight_empty)
         lay.addWidget(self.preflight_card)
         log_card, ll = card(tr("即時紀錄", "Live log"))
@@ -166,7 +191,9 @@ class RunPage(QWidget):
         lay.addLayout(row)
         trow = QHBoxLayout()
         trow.addWidget(w.label(tr("目標視窗", "Target window"), "secondary"))
-        self.target_label = w.label("", "body")
+        # state first (「已找到：…」), eliding the end of a long window title, never widening the page
+        self.target_label = w.ElidedLabel("")
+        self.target_label.setProperty("role", "body")
         trow.addWidget(self.target_label, 1)
         self.change_target_btn = w.push_button(tr("變更", "Change"), "secondary", "window")
         self.change_target_btn.clicked.connect(self.change_target)
@@ -229,8 +256,12 @@ class RunPage(QWidget):
         self.profile_combo.blockSignals(True)
         self.profile_combo.clear()
         self.profile_combo.addItem(tr("（未選擇）", "(none)"), "")
-        for p in profiles:
-            self.profile_combo.addItem(f"{p.name} · {p.game}" if p.game else p.name, p.id)
+        for p in profiles:  # the name only, the game as tooltip - like the Codes page header
+            self.profile_combo.addItem(p.name or tr("（未命名）", "(unnamed)"), p.id)
+            game = p.game.strip() or p.name.strip() or tr("（未命名）", "(unnamed)")
+            self.profile_combo.setItemData(self.profile_combo.count() - 1,
+                                           tr("遊戲：{game}", "Game: {game}").format(game=game),
+                                           Qt.ItemDataRole.ToolTipRole)
         self.profile_combo.setCurrentIndex(max(0, self.profile_combo.findData(active)))
         self.profile_combo.blockSignals(False)
         self.refresh_target()
@@ -253,60 +284,116 @@ class RunPage(QWidget):
         elif p.target.is_empty():
             self.target_label.setText(tr("尚未選擇目標視窗", "No target window yet"))
         else:
-            info = find_target(p)
-            self.target_label.setText(tr(f"{info.title}（已找到）", f"{info.title} (found)") if info is not None
-                                      else tr(f"找不到目標視窗：{p.target.describe()}", f"Target window not found: {p.target.describe()}"))
+            self.target_label.setText(self._target_text(p, find_target(p)))
         self.schedule_recheck()
+
+    @staticmethod
+    def _target_text(p: Profile, info: WindowInfo | None) -> str:
+        if info is not None:
+            return tr("已找到：{title}", "Found: {title}").format(title=info.title)
+        return tr("找不到目標視窗：{target}", "Target window not found: {target}").format(target=p.target.describe())
+
+    def _sync_target_line(self, p: Profile, report: Any) -> None:
+        """The preflight report holds the latest window lookup: the line says the same thing as
+        the list below it (found -> its title; target_not_found -> not found)."""
+        target = getattr(report, "target", None)
+        if target is not None:
+            self.target_label.setText(self._target_text(p, target))
+        elif any(getattr(i, "key", "") == "target_not_found" for i in getattr(report, "issues", ())):
+            self.target_label.setText(self._target_text(p, None))
 
     def schedule_recheck(self) -> None:
         self._recheck_timer.start()
 
+    def _set_preflight_note(self, text: str) -> None:
+        """The muted line under the pre-flight items (「一切就緒。」, why there is no check); hidden
+        while empty, so the card's padding below the last item matches the padding above."""
+        self.preflight_empty.setText(text)
+        self.preflight_empty.setVisible(bool(text))
+
+    def _run_active(self) -> bool:
+        """A run is in progress: the session says so, or the last run state this page saw does."""
+        if call(self.ctx.session.is_active, default=False):
+            return True
+        return self._state not in _IDLE_STATES
+
+    def _set_setup_enabled(self, active: bool) -> None:
+        """The setup card describes the next run: locked as a whole while one is in progress
+        (profile, target, selection, check, buttons). recheck() refines 開始兌換 / 測試一筆."""
+        has_profile = self.profile() is not None
+        for b in (self.start_btn, self.test_btn, self.preview_btn, self.change_target_btn, self.edit_btn):
+            b.setEnabled(has_profile and not active)
+        for widget in (self.profile_combo, self.selection, self.recheck_btn, self.refresh_btn):
+            widget.setEnabled(not active)
+        self.profile_combo.setToolTip(tr("執行中無法切換設定檔", "You cannot switch profiles during a run") if active else "")
+        if active:
+            self.start_btn.setToolTip("")
+            self.hint.setText(_run_lock_text())
+
     def _counts_for(self, p: Profile) -> tuple[int, int]:
-        unfinished = call(self.ctx.queue.runnable, RunSelection.UNFINISHED, p.game_key(), default=[]) or []
-        checked = call(self.ctx.queue.runnable, RunSelection.CHECKED, p.game_key(), default=[]) or []
-        return len(unfinished), len(checked)
+        key = p.game_key()
+        unfinished = call(self.ctx.queue.runnable, RunSelection.UNFINISHED, key, default=[]) or []
+        checked = call(self.ctx.queue.runnable, RunSelection.CHECKED, key, default=[]) or []
+        # the code being processed is not finished either: with it, these counts and 「已處理 n / N 筆」
+        # add up during a run (a code waiting out a cool-down is runnable, so it is counted already)
+        busy = [i for i in (call(self.ctx.queue.items, default=[]) or [])
+                if i.game_key == key and i.status is CodeStatus.RUNNING]
+        return len(unfinished) + len(busy), len(checked) + sum(1 for i in busy if i.checked)
 
     def recheck(self) -> None:
         """Run build_plan + preflight for the active profile (only while no run is active)."""
         p = self.profile()
-        active = bool(call(self.ctx.session.is_active, default=False))
-        for b in (self.start_btn, self.test_btn, self.preview_btn, self.change_target_btn, self.edit_btn):
-            b.setEnabled(p is not None and not active)
+        active = self._run_active()
+        self._set_setup_enabled(active)
+        if not active:
+            self.start_btn.setToolTip("")
         if p is None:
-            self.hint.setText(tr("先建立或選擇設定檔，才能開始兌換。", "Create or choose a profile to start redeeming."))
+            if not active:
+                self.hint.setText(tr("先建立或選擇設定檔，才能開始兌換。", "Create or choose a profile to start redeeming."))
             self.count_label.setText("")
             self.issues.set_issues([])
-            self.preflight_empty.setText(tr("選擇設定檔後會在這裡顯示檢查結果。", "The check appears here once a profile is chosen."))
+            self._set_preflight_note(tr("選擇設定檔後會在這裡顯示檢查結果。", "The check appears here once a profile is chosen."))
             return
         n_all, n_checked = self._counts_for(p)
         self.count_label.setText(tr(f"未完成 {n_all} 筆 · 勾選 {n_checked} 筆", f"{n_all} unfinished · {n_checked} checked"))
         count = n_checked if self.selection_value() is RunSelection.CHECKED else n_all
         self.start_btn.setEnabled(not active and count > 0)
         self.test_btn.setEnabled(not active and n_all > 0)
-        self.hint.setText("" if count else tr(f"沒有「{p.game or p.name}」可以執行的序號。請先到「序號」頁加入序號。",
-                                              f"No runnable codes for '{p.game or p.name}'. Add codes on the Codes page."))
         if active:
-            return
+            return  # _set_setup_enabled showed the run lock hint
+        if not count:
+            from ..runner import messages  # the pre-flight item's words: one sentence on one screen
+
+            self.hint.setText(messages.pf_no_codes(p.game or p.name))
+        else:
+            self.hint.setText("")
         try:
             plan = self.ctx.session.build_plan(p, self.ctx.settings, self.selection_value())
             self._report = self.ctx.session.preflight(plan)
         except NotImplementedError:
             self._report = None
             self.issues.set_issues([])
-            self.preflight_empty.setText(tr("開始前檢查尚未實作。", "The pre-flight check is not implemented yet."))
+            self._set_preflight_note(tr("開始前檢查尚未實作。", "The pre-flight check is not implemented yet."))
             return
         except Exception as exc:
             log.warning("preflight failed: %s", exc)
             self._report = None
             self.issues.set_issues([])
-            self.preflight_empty.setText(tr(f"檢查失敗：{exc}", f"The check failed: {exc}"))
+            self._set_preflight_note(tr(f"檢查失敗：{exc}", f"The check failed: {exc}"))
             return
         self.issues.set_issues(self._report.issues, p)
-        self.preflight_empty.setText("" if self._report.issues else tr("一切就緒。", "Everything is ready."))
+        self._set_preflight_note("" if self._report.issues else tr("一切就緒。", "Everything is ready."))
+        self._sync_target_line(p, self._report)
+        errors = sum(1 for i in self._report.issues if getattr(i, "level", None) is IssueLevel.ERROR)
+        if errors and count:
+            # 開始兌換 stays enabled (its sheet checks again and blocks); say why it will not start
+            text = _blocking_text(errors)
+            self.hint.setText(text)
+            self.start_btn.setToolTip(text)
 
     def showEvent(self, event) -> None:  # noqa: N802
         super().showEvent(event)
-        self.schedule_recheck()
+        self.refresh_target()  # the window may have opened / closed while another page was shown
 
     # ================================================================ actions
     def _on_action(self, action: str) -> None:
@@ -452,8 +539,12 @@ class RunPage(QWidget):
         plan = getattr(self.ctx.session, "plan", None)
         if plan is not None and getattr(plan, "mode", None) is PlanMode.TEST_STEP:
             return  # a step test of the Profiles page, not a run
+        was_active = self._state not in _IDLE_STATES
         self._state = state
-        active = state not in (RunState.IDLE.value, RunState.FINISHED.value)
+        active = state not in _IDLE_STATES
+        if active and not was_active:  # a new run: nothing of the previous one on the card
+            self.running.reset()
+            self._run_counts, self._results = {}, {}
         self.running.setVisible(active)
         self.preflight_card.setVisible(not active)
         self.running.set_state(state)
@@ -471,28 +562,46 @@ class RunPage(QWidget):
             plan = getattr(self.ctx.session, "plan", None)
             self._run_id = plan.run_id if plan is not None else ""
         if not active:
+            self.hint.setText("")  # the recheck below fills it in again
             self.schedule_recheck()
-        for b in (self.start_btn, self.test_btn, self.preview_btn, self.change_target_btn, self.edit_btn):
-            b.setEnabled(not active and self.profile() is not None)
+        self._set_setup_enabled(active)
+        self.running.set_controls_visible(self.attention.isHidden())
 
     def _on_progress(self, done: int, total: int, eta: float) -> None:
         self.running.set_progress(done, total, eta)
 
-    def _on_code_started(self, code_id: str, _index: int) -> None:
-        item = call(self.ctx.queue.get, code_id)
-        self.running.code.setText(item.code if item is not None else "")
+    def _code_text(self, code_id: str) -> str:
+        item = call(self.ctx.queue.get, code_id) if code_id else None
+        return item.code if item is not None else ""
+
+    def _on_code_started(self, code_id: str, index: int) -> None:
+        plan = getattr(self.ctx.session, "plan", None)
+        total = len(plan.items) if plan is not None and getattr(plan, "items", None) is not None else None
+        self.running.set_current(index, self._code_text(code_id), total)
         self.running.step.setText("")
         self.running.info.setText("")
 
     def _on_step_started(self, _code_id: str, index: int, title: str) -> None:
         self.running.step.setText(tr(f"第 {index + 1} 步：{title}", f"Step {index + 1}: {title}"))
 
-    def _on_code_finished(self, _code_id: str, record: Any) -> None:
+    def _on_code_finished(self, code_id: str, record: Any) -> None:
         status = getattr(record, "status", None)
-        if isinstance(status, CodeStatus) and status not in (CodeStatus.PENDING, CodeStatus.COOLDOWN):
-            # retried attempts (interrupted before submitting, rate-limited) are not results
-            self._run_counts[status] = self._run_counts.get(status, 0) + 1
-            self.running.counts.set_counts(self._run_counts)
+        if not isinstance(status, CodeStatus):
+            return
+        if status in (CodeStatus.PENDING, CodeStatus.COOLDOWN) and code_id not in self._results:
+            # retried attempts (interrupted before submitting, rate-limited) are not results; no
+            # step runs while the retry waits
+            self.running.step.setText("")
+            return
+        # one result per code: after a decision (resolve_attention) RunSession emits code_finished
+        # again with the result the user picked, which replaces the code's 需確認 - also 冷卻中 when
+        # the result text was added as a rate-limit keyword (the worker counts it so, too)
+        self._results[code_id] = status
+        self._run_counts = {}
+        for st in self._results.values():
+            self._run_counts[st] = self._run_counts.get(st, 0) + 1
+        self.running.counts.set_counts(self._run_counts)
+        self.running.step.setText(result_text(status))  # done: no step is running any more
 
     def _on_log(self, entry: Any) -> None:
         if isinstance(entry, LogEntry):
@@ -509,19 +618,23 @@ class RunPage(QWidget):
 
     def _on_attention(self, att: Any) -> None:
         if isinstance(att, Attention):
-            self.attention.show_attention(att)
+            self.attention.show_attention(att, self._code_text(att.code_id))
             self.paused_banner.hide()
+            self.running.set_controls_visible(False)  # one 繼續 / 停止 pair: the decision card's
 
     def _on_finished(self, summary: Any) -> None:
         self._state = RunState.FINISHED.value
         self.running.hide()
         self.paused_banner.hide()
         self.attention.hide()
+        self.running.set_controls_visible(True)
+        self.hint.setText("")  # the recheck below fills it in again
+        self._set_setup_enabled(False)
         if isinstance(summary, RunSummary):
             self._summary = summary
             counts = {st: n for st, n in summary.counts.items() if n} if summary.counts else dict(self._run_counts)
             self.summary.show_summary(summary, counts)
-        self._run_counts = {}
+        self._run_counts, self._results = {}, {}
         self._run_id = ""
         self.schedule_recheck()
 

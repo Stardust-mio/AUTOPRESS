@@ -4,14 +4,20 @@
 A sequence of the normal pickers, cancellable at any point (the setup checklist remains):
 1. 選擇目標視窗 (WindowPickerDialog; browsers keep a title keyword the user may shorten),
 2. every ``missing_setup()`` position and result region in step order - with ``realign`` every
-   recorded position (re-pick or keep), instruction = the step's display_title(),
-3. 「結果視窗怎麼關？」 (按確定 -> click_text 確定|OK with on_not_found continue / 按 Esc ->
+   recorded position (re-pick or keep), instruction = the step's own title, or for an untitled step
+   what to pick (「點選第 2 步要點擊的位置」, 「框出結果訊息的範圍」),
+3. 「選擇結果視窗的關閉方式」 (按確定 -> click_text 確定|OK with on_not_found continue / 按 Esc ->
    key Esc / 不用關),
 4. 預覽點位, 5. 測試一筆 (with a paste box for one real code when the queue has none for this
    game; the code is queued for the profile's game).
 Every finished step is saved at once, so a cancel keeps what was set up so far. The UI parts are
 methods (``choose_window``, ``ask_position``, ``pick_position``, ``ask_close_choice``,
 ``preview``, ``ask_test``, ``start_test``) so tests can script them.
+
+Progress (U39): ``run`` counts the screens up front (target if needed + positions + close choice
+if an ocr_check step + test) and every wizard dialog shows 「設定精靈 k/n」 (「重新對準 k/n」) as a
+small caption above its heading; the position dialog's heading is the instruction itself, with
+the profile step it belongs to on a muted line under it.
 """
 
 from __future__ import annotations
@@ -56,33 +62,68 @@ class PositionItem:
     kind: str  # "point" | "region"
     instruction: str
     has_value: bool
+    step_label: str = ""  # the step type's name, e.g. 「點擊位置」 (muted line of the dialog)
+
+
+def progress_text(progress: tuple[int, int] | None, realign: bool = False) -> str:
+    """「設定精靈 2/5」 / 「重新對準 2/5」 ("" without progress)."""
+    if not progress:
+        return ""
+    k, total = progress
+    title = tr("重新對準", "Re-align") if realign else tr("設定精靈", "Setup wizard")
+    return f"{title} {k}/{total}"
+
+
+def untitled_instruction(n: int, params: Any, field: str) -> str:
+    """The instruction for a position of step ``n`` (1-based) that has no title of its own (e.g. a
+    step added 「從空白開始」): what to pick, as an imperative like a template's step name, instead
+    of the bare step type (UI review U39)."""
+    if isinstance(params, OcrCheckParams):  # the templates' name for this step
+        return tr("框出結果訊息的範圍", "Drag over the result message area")
+    if field == "fallback_point":
+        return tr(f"點選第 {n} 步找不到文字時改點的位置", f"Pick where step {n} clicks when its text is not found")
+    if field == "verify_region":
+        return tr(f"框出第 {n} 步要核對的輸入框", f"Drag over the input box that step {n} checks")
+    if field == "region":
+        return tr(f"框出第 {n} 步找文字的範圍", f"Drag over the area where step {n} looks for its text")
+    return tr(f"點選第 {n} 步要點擊的位置", f"Pick the position that step {n} clicks")
+
+
+def _instruction(step: Any, n: int, field: str, part_zh: str = "", part_en: str = "") -> str:
+    """The step's own title (+ 「：part」), or ``untitled_instruction`` for a step without one."""
+    if not (step.label.strip() or step.label_en.strip()):
+        return untitled_instruction(n, step.params, field)
+    title = step.display_title()
+    return tr(f"{title}：{part_zh}", f"{title}: {part_en}") if part_zh else title
 
 
 def position_items(profile: Profile, realign: bool) -> list[PositionItem]:
-    """Positions the wizard asks for, in step order."""
+    """Positions the wizard asks for, in step order. A step with its own title (every template
+    step) is the instruction; an untitled step gets ``untitled_instruction``."""
     out: list[PositionItem] = []
     missing = set(profile.missing_setup())
     for i, step in profile.enabled_steps():
         p = step.params
-        title = step.display_title()
         cands: list[tuple[str, str, str]] = []
         if isinstance(p, ClickPointParams):
-            cands.append(("point", "point", title))
+            cands.append(("point", "point", _instruction(step, i + 1, "point")))
         elif isinstance(p, OcrCheckParams):
-            cands.append(("region", "region", title))
+            cands.append(("region", "region", _instruction(step, i + 1, "region")))
         elif realign and isinstance(p, ClickTextParams):
-            cands += [("region", "region", tr(f"{title}：搜尋範圍", f"{title}: search region")),
-                      ("fallback_point", "point", tr(f"{title}：找不到時改點的位置", f"{title}: fallback position"))]
+            cands += [("region", "region", _instruction(step, i + 1, "region", "搜尋範圍", "search region")),
+                      ("fallback_point", "point",
+                       _instruction(step, i + 1, "fallback_point", "找不到時改點的位置", "fallback position"))]
         elif realign and isinstance(p, TypeCodeParams):
-            cands.append(("verify_region", "region", tr(f"{title}：核對範圍", f"{title}: verify region")))
+            cands.append(("verify_region", "region",
+                          _instruction(step, i + 1, "verify_region", "核對範圍", "verify region")))
         elif realign and isinstance(p, WaitTextParams):
-            cands.append(("region", "region", tr(f"{title}：搜尋範圍", f"{title}: search region")))
+            cands.append(("region", "region", _instruction(step, i + 1, "region", "搜尋範圍", "search region")))
         for name, kind, text in cands:
             value = getattr(p, name)
             if realign and (value is not None or (i, name) in missing):
-                out.append(PositionItem(i, name, kind, text, value is not None))
+                out.append(PositionItem(i, name, kind, text, value is not None, step.type.label()))
             elif not realign and (i, name) in missing:
-                out.append(PositionItem(i, name, kind, text, False))
+                out.append(PositionItem(i, name, kind, text, False, step.type.label()))
     return out
 
 
@@ -115,11 +156,11 @@ def apply_close_choice(profile: Profile, choice: str) -> None:
         step = make_step(StepType.CLICK_TEXT)
         step.params.text = "確定|OK"  # type: ignore[union-attr]
         step.params.on_not_found = TimeoutAction.CONTINUE  # type: ignore[union-attr]
-        step.label, step.label_en = "關閉結果視窗（按確定）", "Close the result (OK)"
+        step.label, step.label_en = "關閉結果（按確定）", "Close result (OK)"
     else:
         step = make_step(StepType.KEY)
         step.params.keys = "Esc"  # type: ignore[union-attr]
-        step.label, step.label_en = "關閉結果視窗（按 Esc）", "Close the result (Esc)"
+        step.label, step.label_en = "關閉結果（按 Esc）", "Close result (Esc)"
     if idx >= 0:
         profile.steps[idx] = step
         return
@@ -134,6 +175,8 @@ class SetupWizard:
         self.profile_id = profile_id
         self.realign = realign
         self.log: list[str] = []  # steps done (tests)
+        self.progress: tuple[int, int] | None = None  # (screen k, of n) shown by the current dialog
+        self.progress_log: list[tuple[int, int]] = []  # every progress value shown (tests)
 
     @property
     def profile(self) -> Profile:
@@ -149,14 +192,21 @@ class SetupWizard:
         p = self.profile
         if p is None:
             return False
-        if self._need_target():
+        need_target = self._need_target()
+        items = position_items(p, self.realign)  # positions do not depend on the target
+        has_close = any(s.type is StepType.OCR_CHECK for _i, s in p.enabled_steps())
+        total = int(need_target) + len(items) + int(has_close) + 1  # + 測試一筆
+        screen = iter(range(1, total + 1))
+        if need_target:
+            self._at(next(screen), total)
             if not self._step_target():
                 return False
-        items = position_items(self.profile, self.realign)
         for n, item in enumerate(items, 1):
+            self._at(next(screen), total)
             if not self._step_position(n, len(items), item):
                 return False
-        if any(s.type is StepType.OCR_CHECK for _i, s in self.profile.enabled_steps()):
+        if has_close:
+            self._at(next(screen), total)
             current = find_close_step(self.profile)[1]
             choice = self.ask_close_choice(current)
             if choice is None:
@@ -165,7 +215,16 @@ class SetupWizard:
             self._save("close")
         self.log.append("preview")
         self.preview()
+        self._at(next(screen), total)
         return self._step_test()
+
+    def _at(self, k: int, total: int) -> None:
+        self.progress = (k, total)
+        self.progress_log.append(self.progress)
+
+    def caption(self) -> str:
+        """「設定精靈 k/n」 for the dialog shown now ("" outside ``run``)."""
+        return progress_text(self.progress, self.realign)
 
     def _need_target(self) -> bool:
         p = self.profile
@@ -252,17 +311,18 @@ class SetupWizard:
     def choose_window(self) -> Any:
         from .window_picker import pick_target_window
 
-        return pick_target_window(self.ctx, self.profile.target, self.parent, suggested_exe=self.profile.suggested_exe)
+        return pick_target_window(self.ctx, self.profile.target, self.parent, suggested_exe=self.profile.suggested_exe,
+                                  caption=self.caption())
 
     def ask_title_keyword(self, keyword: str) -> str | None:
-        dlg = _KeywordDialog(keyword, self.parent)
+        dlg = _KeywordDialog(keyword, self.parent, progress=self.progress, realign=self.realign)
         try:
             return dlg.keyword() if dlg.exec() == QDialog.DialogCode.Accepted else None
         finally:
             dlg.deleteLater()
 
     def ask_position(self, n: int, total: int, item: PositionItem) -> str:
-        dlg = _PositionDialog(n, total, item, self.realign, self.parent)
+        dlg = _PositionDialog(n, total, item, self.realign, self.parent, progress=self.progress)
         try:
             dlg.exec()
             return dlg.answer
@@ -280,7 +340,7 @@ class SetupWizard:
         return pick_region(self.profile, item.instruction, hide=hide)
 
     def ask_close_choice(self, current: str) -> str | None:
-        dlg = _CloseDialog(current, self.parent)
+        dlg = _CloseDialog(current, self.parent, progress=self.progress, realign=self.realign)
         try:
             return dlg.choice() if dlg.exec() == QDialog.DialogCode.Accepted else None
         finally:
@@ -298,7 +358,7 @@ class SetupWizard:
         p = self.profile
         cid = first_runnable(self.ctx, p)
         item = self.ctx.queue.get(cid) if cid else None
-        dlg = _TestDialog(p, item.code if item else "", self.parent)
+        dlg = _TestDialog(p, item.code if item else "", self.parent, progress=self.progress, realign=self.realign)
         try:
             if dlg.exec() != QDialog.DialogCode.Accepted:
                 return None
@@ -315,7 +375,22 @@ class SetupWizard:
 # ----------------------------------------------------------------------------- dialogs
 
 
+def _heading(dlg: QDialog, lay: QVBoxLayout, caption: str, title: str) -> None:
+    """The progress caption (「設定精靈 2/5」, hidden when empty) right above the title: the same
+    head on every wizard dialog. Sets ``dlg.caption`` and ``dlg.heading``."""
+    head = QVBoxLayout()
+    head.setSpacing(2)
+    dlg.caption = w.label(caption, "caption")  # type: ignore[attr-defined]
+    dlg.caption.setVisible(bool(caption))  # type: ignore[attr-defined]
+    head.addWidget(dlg.caption)  # type: ignore[attr-defined]
+    dlg.heading = w.label(title, "title")  # type: ignore[attr-defined]
+    dlg.heading.setWordWrap(True)  # type: ignore[attr-defined]
+    head.addWidget(dlg.heading)  # type: ignore[attr-defined]
+    lay.addLayout(head)
+
+
 def _buttons(dlg: QDialog, lay: QVBoxLayout, specs: list[tuple[str, str, str]]) -> None:
+    lay.addStretch(1)  # spare height goes above the buttons, never into a label (same head everywhere)
     row = QHBoxLayout()
     row.addStretch(1)
     for text, variant, answer in specs:
@@ -328,22 +403,35 @@ def _buttons(dlg: QDialog, lay: QVBoxLayout, specs: list[tuple[str, str, str]]) 
 
 
 class _PositionDialog(QDialog):
-    def __init__(self, n: int, total: int, item: PositionItem, realign: bool, parent: QWidget | None) -> None:
+    """One position to pick. ``n`` / ``total`` count the positions only; the caption shows the
+    wizard's ``progress`` over all its screens (falls back to ``n`` / ``total``)."""
+
+    def __init__(self, n: int, total: int, item: PositionItem, realign: bool, parent: QWidget | None,
+                 *, progress: tuple[int, int] | None = None) -> None:
         super().__init__(parent)
         self.answer = "cancel"
-        title = tr("重新對準", "Re-align") if realign else tr("設定精靈", "Setup wizard")
-        self.setWindowTitle(f"{title} · {n}/{total}")
+        self.setWindowTitle(tr("重新對準", "Re-align") if realign else tr("設定精靈", "Setup wizard"))
         self.setMinimumWidth(480)
         lay = QVBoxLayout(self)
         lay.setContentsMargins(20, 16, 20, 16)
         lay.setSpacing(10)
-        lay.addWidget(w.label(tr(f"第 {item.step_index + 1} 步：{item.instruction}",
-                                 f"Step {item.step_index + 1}: {item.instruction}"), "title"))
-        how = (tr("按「開始點選」後畫面會凍結，請在目標視窗上點一下這個位置。Esc 可取消。",
-                  "After 'Pick' the screen freezes; click this position on the target window. Esc cancels.")
+        _heading(self, lay, progress_text(progress or (n, total), realign), item.instruction)
+        # the profile step this position belongs to (the step list's numbering), kept apart from the caption
+        n_step = item.step_index + 1
+        step = tr(f"設定檔的第 {n_step} 步", f"Step {n_step} of the profile")
+        if item.step_label and item.step_label.strip() != item.instruction.strip():
+            # a step without its own title already shows its type as the heading: not twice
+            step += tr(f"：{item.step_label}", f": {item.step_label}")
+        self.step_line = w.label(step, "secondary")
+        lay.addWidget(self.step_line)
+        # 「Esc 可取消。」 on a line of its own: at the dialog's width it otherwise wrapped as a lone 「消。」
+        how = (tr("按「開始點選」後畫面會暫時定格，請在目標視窗上點一下這個位置。\nEsc 可取消。",
+                  "After 'Pick' the screen pauses on a still image; click this position on the target window.\n"
+                  "Esc cancels.")
                if item.kind == "point" else
-               tr("按「開始框選」後畫面會凍結，請按住滑鼠拖曳框出這個範圍。Esc 可取消。",
-                  "After 'Drag' the screen freezes; hold the mouse button and drag around this area. Esc cancels."))
+               tr("按「開始框選」後畫面會暫時定格，請按住滑鼠拖曳框出這個範圍。\nEsc 可取消。",
+                  "After 'Drag' the screen pauses on a still image; hold the mouse button and drag around this area.\n"
+                  "Esc cancels."))
         hl = w.label(how, "muted")
         hl.setWordWrap(True)
         lay.addWidget(hl)
@@ -361,14 +449,15 @@ class _PositionDialog(QDialog):
 
 
 class _CloseDialog(QDialog):
-    def __init__(self, current: str, parent: QWidget | None) -> None:
+    def __init__(self, current: str, parent: QWidget | None, *, progress: tuple[int, int] | None = None,
+                 realign: bool = False) -> None:
         super().__init__(parent)
-        self.setWindowTitle(tr("設定精靈", "Setup wizard"))
+        self.setWindowTitle(tr("重新對準", "Re-align") if realign else tr("設定精靈", "Setup wizard"))
         self.setMinimumWidth(460)
         lay = QVBoxLayout(self)
         lay.setContentsMargins(20, 16, 20, 16)
         lay.setSpacing(8)
-        lay.addWidget(w.label(tr("結果視窗怎麼關？", "How is the result closed?"), "title"))
+        _heading(self, lay, progress_text(progress, realign), tr("選擇結果視窗的關閉方式", "Choose how the result is closed"))
         self.group = QButtonGroup(self)
         self.radios: dict[str, QRadioButton] = {}
         for key, text in ((CLOSE_OK, tr("按「確定」（找不到就略過）", "Click 'OK' (skipped when it is not there)")),
@@ -392,13 +481,15 @@ class _CloseDialog(QDialog):
 
 
 class _KeywordDialog(QDialog):
-    def __init__(self, keyword: str, parent: QWidget | None) -> None:
+    def __init__(self, keyword: str, parent: QWidget | None, *, progress: tuple[int, int] | None = None,
+                 realign: bool = False) -> None:
         super().__init__(parent)
         self.setWindowTitle(tr("標題關鍵字", "Title keyword"))
         self.setMinimumWidth(480)
         lay = QVBoxLayout(self)
         lay.setContentsMargins(20, 16, 20, 16)
         lay.setSpacing(8)
+        _heading(self, lay, progress_text(progress, realign), tr("確認視窗標題的關鍵字", "Check the window title keyword"))
         info = w.label(tr("瀏覽器的每個分頁都是同一個程式，AutoPress 只會在視窗標題含有這個關鍵字時輸入。"
                           "可以縮短（例如只留「兌換」），但不能留空。",
                           "Every browser tab is the same program, so AutoPress only types while the window title "
@@ -413,6 +504,7 @@ class _KeywordDialog(QDialog):
         self.ok_btn.clicked.connect(self.accept)
         cancel = w.push_button(tr("取消精靈", "Cancel wizard"), "ghost")
         cancel.clicked.connect(self.reject)
+        lay.addStretch(1)  # spare height above the buttons (same head on every wizard dialog)
         row = QHBoxLayout()
         row.addStretch(1)
         row.addWidget(cancel)
@@ -428,19 +520,21 @@ class _KeywordDialog(QDialog):
 
 
 class _TestDialog(QDialog):
-    def __init__(self, profile: Profile, queued_code: str, parent: QWidget | None) -> None:
+    def __init__(self, profile: Profile, queued_code: str, parent: QWidget | None, *,
+                 progress: tuple[int, int] | None = None, realign: bool = False) -> None:
         super().__init__(parent)
         self.setWindowTitle(tr("測試一筆", "Test one"))
         self.setMinimumWidth(500)
         lay = QVBoxLayout(self)
         lay.setContentsMargins(20, 16, 20, 16)
         lay.setSpacing(8)
-        lay.addWidget(w.label(tr("用一筆真的序號測試", "Test with one real code"), "title"))
+        _heading(self, lay, progress_text(progress, realign), tr("用一筆真的序號測試", "Test with one real code"))
         game = profile.game or profile.name
         self.edit: QLineEdit | None = None
         if queued_code:
-            text = tr(f"會用佇列中的第一筆序號「{queued_code}」實際跑一次，並把讀到的結果給你看。",
-                      f"The first queued code '{queued_code}' is run once and the result it reads is shown.")
+            text = tr(f"會用第一筆待兌換的序號「{queued_code}」實際跑一次，並把讀到的結果給你看。",
+                      f"The first code waiting to be redeemed, '{queued_code}', is run once and the result it reads "
+                      "is shown.")
         else:
             text = tr(f"佇列裡還沒有「{game}」的序號。貼上一個真的序號來測試（會加入佇列，屬於「{game}」）。",
                       f"There is no queued code for '{game}' yet. Paste one real code to test (it is queued for '{game}').")
@@ -452,6 +546,7 @@ class _TestDialog(QDialog):
             self.edit.setPlaceholderText(tr("貼上一個序號", "Paste one code"))
             self.edit.textChanged.connect(self._update)
             lay.addWidget(self.edit)
+        lay.addStretch(1)  # spare height above the buttons (same head on every wizard dialog)
         row = QHBoxLayout()
         row.addStretch(1)
         later = w.push_button(tr("稍後再說", "Later"), "ghost")
@@ -471,4 +566,4 @@ class _TestDialog(QDialog):
 
 
 __all__ = ["CLOSE_ESC", "CLOSE_NONE", "CLOSE_OK", "PositionItem", "SetupWizard", "apply_close_choice",
-           "find_close_step", "position_items"]
+           "find_close_step", "position_items", "progress_text"]

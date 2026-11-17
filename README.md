@@ -56,15 +56,15 @@ AutoPress 沒有付費的程式碼簽章，第一次執行時 Windows 可能會�
 
 1. 解壓縮後執行 `AutoPress.exe`，在歡迎畫面選語言與外觀。
 2. 到「**設定檔**」頁按「從範本新增」，選一個範本（兌換網頁優先選「網頁兌換」）。在「遊戲」欄填上遊戲名稱。
-3. 照設定精靈的指示：選目標視窗（遊戲或兌換網頁）→ 點一下序號輸入框 → 拉出結果訊息出現的範圍 → 選怎麼關閉結果視窗。
+3. 照設定精靈的指示：選目標視窗（遊戲或兌換網頁）→ 點一下序號輸入框 → 框出結果訊息的範圍 → 選怎麼關閉結果視窗。
 4. 到「**序號**」頁匯入序號，檢查標成「需確認」的序號。
-5. 先按「**試跑 1 筆**」確認結果判讀正確，再按「**開始兌換**」。執行中主視窗會縮成迷你控制列；F8 暫停、F9 停止。
+5. 先按「**測試一筆**」確認結果判讀正確，再按「**開始兌換**」。執行中主視窗會縮成迷你控制列；F8 暫停、F9 停止。
 
 ## 系統需求
 
 - Windows 10 或 Windows 11（64 位元）。不需要系統管理員權限，不需要安裝、不需要連網。
 - 解壓縮後約 200 MB（估計值）。
-- 遊戲若以系統管理員身分執行，Windows 會擋下一般程式的模擬輸入；這時 AutoPress 會提醒你改用「以系統管理員身分重新啟動 AutoPress」。
+- 遊戲若以系統管理員身分執行，Windows 會擋下一般程式的模擬輸入；這時開始前的檢查清單會提醒你，按「以系統管理員身分重新啟動」即可。
 - 獨佔全螢幕的遊戲畫面截不到（會是全黑）；請把遊戲改成「無邊框視窗」或視窗模式。
 
 ## 資料放在哪裡
@@ -75,7 +75,7 @@ AutoPress 沒有付費的程式碼簽章，第一次執行時 Windows 可能會�
 
 ## 常見問題
 
-- **按了開始卻沒有輸入任何字**：目標程式可能以系統管理員身分執行（開始前的檢查清單會提醒），或遊戲只認實體按鍵：在設定檔的「輸入序號」步驟改用「遊戲模式（按鍵碼）」或「貼上（剪貼簿）」，再用「試跑 1 筆」確認。
+- **按了開始卻沒有輸入任何字**：目標程式可能以系統管理員身分執行（開始前的檢查清單會提醒），或遊戲只認實體按鍵：在設定檔的「輸入序號」步驟改用「遊戲模式（按鍵碼）」或「貼上（剪貼簿）」，再用「測試一筆」確認。
 - **輸入的字被注音輸入法改掉**：預設的「模擬鍵入」不受注音影響；「遊戲模式」會先暫時關閉目標視窗的輸入法。仍有問題時改用「貼上」。
 - **找不到按鈕文字**：確認兌換視窗已開啟；在設定檔裡調整要找的文字（例如 `兌換|Redeem`）或設定搜尋範圍。
 - **畫面截圖全黑**：遊戲在獨佔全螢幕模式；改成無邊框視窗。
@@ -119,6 +119,6 @@ AutoPress enters game redeem codes for you on Windows 10/11: import your codes (
 2. **"Windows protected your PC"** (the app is not code-signed): click **More info**, check that the app is `AutoPress.exe`, then click **Run anyway**. If your antivirus quarantines a file (AutoPress simulates keyboard and mouse input, registers the F8/F9 hotkeys and captures the screen for OCR), restore it from quarantine or download and unzip the package again.
 3. On the **Profiles** page click "New from template" and pick one: *Web redeem page (generic)*, *HoYoverse web redeem* or *In-game redeem dialog (generic)*. Enter the game name, then follow the setup wizard: pick the target window, click the code input box, drag over the area where the result message appears, and choose how the result popup is closed.
 4. On the **Codes** page import your codes and check the ones marked *Needs review*.
-5. Click **Test 1 code** (Codes page) or **Test one** (Run page) to check that the result is read correctly, then **Start**. During a run the main window shrinks to a mini bar: **F8** pauses / resumes, **F9** stops, and moving the mouse into the outer top-left corner of the desktop is an emergency stop. If you move the mouse or type, the run pauses before AutoPress types or clicks again.
+5. Click **Test one** (Codes or Run page) to check that the result is read correctly, then **Start**. During a run the main window shrinks to a mini bar: **F8** pauses / resumes, **F9** stops, and moving the mouse into the outer top-left corner of the desktop is an emergency stop. If you move the mouse or type, the run pauses before AutoPress types or clicks again.
 
 Your data stays in `%APPDATA%\AutoPress` (or in a `data` folder next to the exe when you create an empty `portable.txt` there). Downloads: not decided yet (see 「下載」 above). Licence: GPL-3.0; third-party notices in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).

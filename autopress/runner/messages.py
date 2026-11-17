@@ -289,7 +289,7 @@ def waited(seconds: float) -> str:
 
 
 def wait_skipped() -> str:
-    return tr("試跑不等待", "Dry run: no waiting")
+    return tr("測試時不等待", "Dry run: no waiting")
 
 
 def focused() -> str:
@@ -303,9 +303,9 @@ def result_read(label: str, text: str) -> str:
 # ----------------------------------------------------------------------------- preflight (SPEC 7.2)
 
 def pf_target_elevated() -> str:
-    return tr("目標程式以系統管理員權限執行，Windows 會無聲阻擋一般權限程式的模擬輸入。請按「以系統管理員身分重新啟動 AutoPress」。",
+    return tr("目標程式以系統管理員權限執行，Windows 會無聲阻擋一般權限程式的模擬輸入。請按「以系統管理員身分重新啟動」。",
               'The target runs as administrator; Windows silently blocks simulated input from normal programs. '
-              'Click "Restart AutoPress as administrator".')
+              'Click "Restart as administrator".')
 
 
 def pf_target_elevated_standard_user() -> str:
@@ -378,12 +378,12 @@ def pf_target_minimized() -> str:
 
 def pf_size_changed(a: str, b: str, ratio: bool) -> str:
     if ratio:
-        return tr(f"視窗大小與錄製時不同（{a} → {b}），將依比例換算；建議先預覽或重新對準",
+        return tr(f"視窗大小與錄製時不同（{a} → {b}），將依比例換算；建議先預覽或重新對準。",
                   f"The window size differs from the recording ({a} → {b}); positions are scaled. Preview or "
-                  "re-align first")
-    return tr(f"視窗大小與錄製時不同（{a} → {b}），位置依固定像素計算；建議先預覽或重新對準",
+                  "re-align first.")
+    return tr(f"視窗大小與錄製時不同（{a} → {b}），位置依固定像素計算；建議先預覽或重新對準。",
               f"The window size differs from the recording ({a} → {b}); positions keep fixed pixels. Preview or "
-              "re-align first")
+              "re-align first.")
 
 
 def pf_dpi_changed(a: int, b: int) -> str:
@@ -396,7 +396,11 @@ def pf_points_missing(steps: str) -> str:
     return tr(f"還有位置或結果範圍尚未設定（第 {steps} 步）。", f"Some positions or result regions are not set (step {steps}).")
 
 
-def pf_no_codes() -> str:
+def pf_no_codes(game: str = "") -> str:
+    """The pre-flight item and the Run page's hint under 開始兌換 (one sentence on one screen)."""
+    if game:
+        return tr(f"沒有「{game}」可執行的序號。請先在「序號」頁加入序號。",
+                  f"There are no runnable codes for '{game}'. Add codes on the Codes page first.")
     return tr("沒有這個遊戲可執行的序號。請先在「序號」頁加入序號。",
               "There are no runnable codes for this game. Add codes on the Codes page first.")
 

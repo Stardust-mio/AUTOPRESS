@@ -329,12 +329,12 @@ def test_window_picker_lists_badges_and_disables_forbidden(demo_ctx: Any, qtbot:
     dlg = WindowPickerDialog(demo_ctx, None, None, suggested_exe="game.exe")
     qtbot.addWidget(dlg)
     items = [dlg.tree.topLevelItem(i) for i in range(dlg.tree.topLevelItemCount())]
-    assert [it.text(1) for it in items][0] == "game.exe"  # the suggested exe first
-    by_exe = {it.text(1): it for it in items}
+    assert [it.text(1) for it in items][0] == "game.exe · 建議"  # the suggested exe first, marked in its column
+    by_exe = {it.text(1).split(" · ")[0]: it for it in items}
     assert not (by_exe["explorer.exe"].flags() & Qt.ItemFlag.ItemIsEnabled)
     assert "系統程式，不能當目標" in by_exe["explorer.exe"].text(2)
-    assert "系統管理員" in by_exe["game.exe"].text(2) and "建議" in by_exe["game.exe"].text(2)
-    assert "未知權限" in by_exe["notepad.exe"].text(2)
+    assert "系統管理員" in by_exe["game.exe"].text(2) and "建議" not in by_exe["game.exe"].text(2)
+    assert by_exe["notepad.exe"].text(2) == "可能無法輸入"  # UNKNOWN privileges, in the user's terms
     assert "已最小化" in by_exe["launcher.exe"].text(2)
     assert not dlg.select_hwnd(1)  # forbidden: cannot be selected
     assert dlg.select_hwnd(2) and dlg.ok_btn.isEnabled()

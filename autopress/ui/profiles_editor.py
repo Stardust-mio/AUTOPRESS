@@ -24,6 +24,7 @@ from ..models import (
     clone,
 )
 from ..textutil import clean_text, levenshtein, squash
+from . import theme
 from . import widgets as w
 from .step_forms import DoubleSpinBox, SpinBox, parse_sizes
 
@@ -84,6 +85,41 @@ def _form() -> QFormLayout:
     return f
 
 
+def form_labels(forms: Sequence[QFormLayout]) -> list[QWidget]:
+    """The label widgets of ``forms`` (rows without a label are skipped)."""
+    out: list[QWidget] = []
+    for f in forms:
+        for row in range(f.rowCount()):
+            item = f.itemAt(row, QFormLayout.ItemRole.LabelRole)
+            if item is not None and item.widget() is not None:
+                out.append(item.widget())
+    return out
+
+
+def align_form_labels(forms: Sequence[QFormLayout]) -> int:
+    """Give every label of ``forms`` the width of the widest one, so the fields of the editor
+    cards (basics, target, format, run rules) start at the same x (U35). Returns that width."""
+    labels = form_labels(forms)
+    for lb in labels:
+        lb.setMinimumWidth(0)
+        lb.ensurePolished()  # the role font (QSS) decides the width
+    width = max((lb.sizeHint().width() for lb in labels), default=0)
+    for lb in labels:
+        lb.setMinimumWidth(width)
+    return width
+
+
+def _with_hint(widget: QWidget, hint: QWidget) -> QWidget:
+    """``widget`` with a muted hint line under it (one form field)."""
+    box = QWidget()
+    v = QVBoxLayout(box)
+    v.setContentsMargins(0, 0, 0, 0)
+    v.setSpacing(2)
+    v.addWidget(widget)
+    v.addWidget(hint)
+    return box
+
+
 def card(title: str, subtitle: str = "") -> tuple[QWidget, QVBoxLayout]:
     c = w.Card(True, None, 10)
     lay = c.layout()
@@ -131,13 +167,17 @@ class BasicsCard(QWidget):
         f.addRow(w.label(tr("遊戲", "Game"), "secondary"), game_box)
         self.description = QLineEdit()
         self.description.setMaxLength(200)
+        self.description.setPlaceholderText(tr("例如：官方網頁兌換，要先登入（可留空）",
+                                               "e.g. Official web page, log in first (optional)"))
         self.description.textChanged.connect(self._apply)
         f.addRow(w.label(tr("說明", "Description"), "secondary"), self.description)
         self.author = QLineEdit()
         self.author.setMaxLength(60)
+        self.author.setPlaceholderText(tr("分享時顯示的名字（可留空）", "Name shown when you share it (optional)"))
         self.author.textChanged.connect(self._apply)
         f.addRow(w.label(tr("作者", "Author"), "secondary"), self.author)
         lay.addLayout(f)
+        self.form = f
 
     def load(self, profile: Profile) -> None:
         self._loading = True
@@ -198,8 +238,11 @@ class TargetCard(QWidget):
         self.summary = w.label("", "body")
         self.summary.setWordWrap(True)
         row.addWidget(self.summary, 1)
-        self.status = w.label("", "muted")
-        row.addWidget(self.status)
+        # a long window title elides (full text in the tooltip) instead of widening the page (U4)
+        self.status = w.ElidedLabel("")
+        self.status.setProperty("role", "muted")
+        self.status.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        row.addWidget(self.status, 2)
         self.pick_btn = w.push_button(tr("選擇視窗…", "Choose window…"), "secondary", "window")
         self.pick_btn.clicked.connect(on_pick)
         row.addWidget(self.pick_btn)
@@ -226,10 +269,13 @@ class TargetCard(QWidget):
         sp = QHBoxLayout(sp_box)
         sp.setContentsMargins(0, 0, 0, 0)
         sp.addWidget(self.same_process)
-        sp.addWidget(w.label(tr("同一個程式的其他視窗（例如彈窗）也算目標；匯出時不會保留",
-                                "Other windows of the same program (popups) count too; never exported"), "muted"), 1)
+        sp_hint = w.label(tr("同一個程式的其他視窗（例如彈窗）也算目標；匯出時不會保留",
+                             "Other windows of the same program (popups) count too; never exported"), "muted")
+        sp_hint.setWordWrap(True)  # wraps in a narrow window instead of widening the page (U4)
+        sp.addWidget(sp_hint, 1)
         f.addRow(w.label(tr("彈窗", "Popups"), "secondary"), sp_box)
         lay.addLayout(f)
+        self.form = f
         self.issue = w.label("", "error")
         self.issue.setWordWrap(True)
         self.issue.hide()
@@ -269,27 +315,28 @@ class TargetCard(QWidget):
         t = p.target
         if t.is_empty():
             self.summary.setText(tr("尚未選擇目標視窗", "No target window yet"))
+            self.summary.setToolTip("")
             self.summary.setProperty("role", "error")
         else:
-            parts = [t.exe or tr("（任何程式）", "(any program)")]
-            if t.class_name:
-                parts.append(tr(f"類別 {t.class_name}", f"class {t.class_name}"))
-            self.summary.setText(" · ".join(parts))
+            # the window class is a developer detail: tooltip only, as in the window picker (U30)
+            self.summary.setText(t.exe or tr("（任何程式）", "(any program)"))
+            self.summary.setToolTip(tr(f"視窗類別：{t.class_name}", f"Window class: {t.class_name}") if t.class_name else "")
             self.summary.setProperty("role", "body")
         self.summary.style().unpolish(self.summary)
         self.summary.style().polish(self.summary)
         self.status.setToolTip("")
         if live is not None:
-            from .window_picker import elevated_text, input_permission_of
+            from .window_picker import elevated_card_text, input_permission_of, unknown_badge, unknown_text
 
             title = getattr(live, "title", "")
             text = tr(f"已找到：{title}", f"Found: {title}")
             perm = input_permission_of(getattr(live, "hwnd", 0))
             if perm == "blocked_elevated":
                 text += tr(" · 系統管理員", " · Administrator")
-                self.status.setToolTip(elevated_text())
+                self.status.setToolTip(f"{text}\n{elevated_card_text()}")
             elif perm == "unknown":
-                text += tr(" · 未知權限", " · Unknown privileges")
+                text += " · " + unknown_badge()
+                self.status.setToolTip(f"{text}\n{unknown_text()}")
             self.status.setText(text)
         elif not t.is_empty():
             self.status.setText(tr("目前找不到這個視窗", "Not found right now"))
@@ -328,17 +375,34 @@ class FormatCard(QWidget):
         outer.addWidget(c)
         f = _form()
         self.preset = QComboBox()
+        # the field grows to the full width anyway; the longest preset name must not set the card's
+        # minimum width (in English it made the editor scroll sideways at the 1100 x 700 window)
+        self.preset.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
+        self.preset.setMinimumContentsLength(12)
         self._formats = self._preset_list()
         for fmt in self._formats:
             self.preset.addItem(self._label(fmt.id), fmt.id)
+        self.preset.view().setMinimumWidth(self.preset.view().sizeHintForColumn(0) + 32)  # full names in the popup
         self.preset.currentIndexChanged.connect(self._preset_changed)
         f.addRow(w.label(tr("序號格式", "Code format"), "secondary"), self.preset)
         self.example = w.label("", "muted")
         f.addRow(w.label("", "secondary"), self.example)
         self.charset = QLineEdit()
         self.charset.setPlaceholderText("A-Za-z0-9")
+        self.charset.setToolTip(tr("進階：用「-」表示範圍，例如 A-Z0-9 是大寫英文與數字。",
+                                   "Advanced: use - for ranges, e.g. A-Z0-9 = capital letters and digits."))
         self.charset.textChanged.connect(self._custom)
-        f.addRow(w.label(tr("允許的字元", "Allowed characters"), "secondary"), self.charset)
+        # the allowed characters in plain words (U30): 「英文字母與數字」 instead of only "A-Za-z0-9"
+        self.charset_hint = w.label("", "muted")
+        self.charset_hint.setWordWrap(True)
+        # a preset shows only the words; the editable rule appears with 「自訂」 (picking 自訂 keeps the
+        # preset's rule, so nothing is lost), so a gamer never meets "A-Za-z0-9" unless they customise
+        self.charset_words = w.label("", "body")
+        self.charset_words.setMinimumHeight(theme.CONTROL_H)
+        self.charset_words.setWordWrap(True)
+        charset_box = _with_hint(self.charset, self.charset_hint)
+        charset_box.layout().insertWidget(0, self.charset_words)
+        f.addRow(w.label(tr("允許的字元", "Allowed characters"), "secondary"), charset_box)
         lens = QWidget()
         lh = QHBoxLayout(lens)
         lh.setContentsMargins(0, 0, 0, 0)
@@ -352,7 +416,10 @@ class FormatCard(QWidget):
         lh.addWidget(w.label("–", "secondary"))
         lh.addWidget(self.max_len)
         lh.addStretch(1)
-        f.addRow(w.label(tr("長度（不含分隔符號）", "Length (no separators)"), "secondary"), lens)
+        # short label + hint: the old 「長度（不含分隔符號）」 set the width of the shared label column (U35)
+        len_hint = w.label(tr("不含分隔符號", "Separators are not counted"), "muted")
+        len_hint.setWordWrap(True)
+        f.addRow(w.label(tr("長度", "Length"), "secondary"), _with_hint(lens, len_hint))
         self.groups = QLineEdit()
         self.groups.setPlaceholderText(tr("例如 5,5,5（可留空）", "e.g. 5,5,5 (optional)"))
         self.groups.textChanged.connect(self._custom)
@@ -366,6 +433,7 @@ class FormatCard(QWidget):
         self.coord.currentIndexChanged.connect(self._coord_changed)
         f.addRow(w.label(tr("座標模式", "Positions"), "secondary"), self.coord)
         lay.addLayout(f)
+        self.form = f
         hint = w.label(tr("自動：視窗大小不變時用錄製的像素，改變時依比例換算。網頁建議「固定像素」，"
                           "畫面會跟著縮放的遊戲建議「依視窗比例」。",
                           "Automatic: recorded pixels while the window size is unchanged, otherwise scaled. "
@@ -429,6 +497,34 @@ class FormatCard(QWidget):
         self.case.setChecked(fmt.case_sensitive)
         ex = self._example(fmt.id)
         self.example.setText(tr(f"範例：{ex}", f"Example: {ex}") if ex else "")
+        self._update_charset_hint()
+        self._show_charset_as(fmt.id == "custom")
+
+    def _show_charset_as(self, editable: bool) -> None:
+        """The charset row: the editable rule with its words under it (自訂), or only the words."""
+        self.charset.setVisible(editable)
+        self.charset_hint.setVisible(editable)
+        self.charset_words.setVisible(not editable)
+
+    def _update_charset_hint(self) -> None:
+        """「英文字母與數字」 for the charset field (and the case switch); a set without plain
+        words gets the range rule instead."""
+        charset = clean_text(self.charset.text()).strip()
+        text = ""
+        try:
+            from ..codes import presets
+
+            label = presets.charset_label(charset, self.case.isChecked()) if charset else ""
+            if label and label != charset.replace("-", presets.NB_HYPHEN):  # not just the raw set again
+                text = label
+        except Exception as exc:  # G1 stub
+            log.debug("charset_label unavailable: %s", exc)
+        if not text:
+            text = tr("用「-」表示範圍，例如 A-Z0-9 是大寫英文與數字", "Use - for ranges, e.g. A-Z0-9 = capital letters and digits")
+            self.charset_words.setText(charset)  # a preset whose set has no plain words: the set itself
+        else:
+            self.charset_words.setText(text)
+        self.charset_hint.setText(text)
 
     def _preset_changed(self) -> None:
         if self._loading or self.profile is None:
@@ -450,6 +546,7 @@ class FormatCard(QWidget):
         self.on_change()
 
     def _custom(self, *_a: object) -> None:
+        self._update_charset_hint()
         if self._loading or self.profile is None:
             return
         fmt = self.profile.code_format
@@ -467,6 +564,7 @@ class FormatCard(QWidget):
             if idx >= 0:
                 self.preset.setCurrentIndex(idx)
             self._loading = False
+            self._show_charset_as(True)
         self._update_issue()
         self.on_change()
 
@@ -544,6 +642,7 @@ class PolicyCard(QWidget):
         self.unknown.currentIndexChanged.connect(self._apply)
         f.addRow(w.label(tr("無法判讀結果時", "Unrecognised result"), "secondary"), self.unknown)
         lay.addLayout(f)
+        self.form = f
         self.issue = w.label("", "error")
         self.issue.setWordWrap(True)
         self.issue.hide()
@@ -598,4 +697,5 @@ class PolicyCard(QWidget):
         self.issue.setVisible(bool(issues))
 
 
-__all__ = ["BasicsCard", "FormatCard", "PolicyCard", "TargetCard", "card", "known_game_names", "similar_game"]
+__all__ = ["BasicsCard", "FormatCard", "PolicyCard", "TargetCard", "align_form_labels", "card", "form_labels",
+           "known_game_names", "similar_game"]

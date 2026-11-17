@@ -1,7 +1,8 @@
 # OWNED BY G3
 """win32.input with SendInput MOCKED (no input reaches Windows): InputBlocked on short counts,
 keys / buttons released when a hold's sleep raises, clipboard and IME restored in finally,
-guard order and messages, failsafe corners, wrap-safe ticks, event encoding (SPEC 2.7, 8.2)."""
+guard order and messages, failsafe corners, wrap-safe ticks, event encoding (SPEC 2.7, 8.2); also
+the desktop-state restore that tests/conftest.py puts around every realinput test."""
 
 from __future__ import annotations
 
@@ -875,3 +876,75 @@ def test_bring_to_foreground_propagates_input_blocked(rec: SendRecorder, monkeyp
     rec.script = [0]
     with pytest.raises(inp.InputBlocked):
         inp.bring_to_foreground(TARGET, verify_s=0.0, sleep=lambda s: None)
+
+
+# ----------------------------------------------------------------------------- realinput harness (desktop state)
+
+
+class Desktop:
+    """Fakes for tests/win32_harness.desktop_state_restored(): clipboard, CapsLock, cursor and
+    release_all_modifiers (SendInput is the ``rec`` recorder): nothing reaches the real desktop."""
+
+    def __init__(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        from autopress.win32 import clipboard
+
+        self.seq, self.caps, self.cursor = 7, 0, (10, 20)
+        self.snap: object = object()
+        self.restored: list[object] = []
+        self.moved: list[tuple[int, int]] = []
+        self.released = 0
+        self.busy_restore = False
+        monkeypatch.setattr(clipboard, "snapshot", self.snapshot)
+        monkeypatch.setattr(clipboard, "restore", self.restore)
+        monkeypatch.setattr(api, "GetClipboardSequenceNumber", lambda: self.seq)
+        monkeypatch.setattr(api, "GetKeyState", lambda vk: self.caps if vk == api.VK_CAPITAL else 0)
+        monkeypatch.setattr(api, "cursor_pos", lambda: self.cursor)
+        monkeypatch.setattr(api, "SetCursorPos", lambda x, y: self.moved.append((x, y)))
+        monkeypatch.setattr(inp, "release_all_modifiers", self.release)
+        monkeypatch.setattr(time, "sleep", lambda s: None)
+
+    def snapshot(self) -> object:
+        if self.snap is None:
+            raise inp.ClipboardBusy()
+        return self.snap
+
+    def restore(self, snap: object) -> None:
+        if self.busy_restore:
+            raise inp.ClipboardBusy()
+        self.restored.append(snap)
+
+    def release(self) -> list[int]:
+        self.released += 1
+        return []
+
+
+def test_desktop_state_restored_puts_back_only_what_changed(rec: SendRecorder, monkeypatch: pytest.MonkeyPatch) -> None:
+    """tests/conftest.py wraps every realinput test in it (those run only with AUTOPRESS_REALINPUT=1)."""
+    from tests.win32_harness import desktop_state_restored
+
+    d = Desktop(monkeypatch)
+    with desktop_state_restored():
+        pass  # nothing changed: nothing is written back, held keys are still released
+    assert (d.restored, d.moved, rec.batches, d.released) == ([], [], [], 1)
+    with pytest.raises(Boom), desktop_state_restored():  # the restore also runs when the body raises
+        d.seq, d.caps, d.cursor = 8, 1, (300, 400)
+        raise Boom
+    assert d.restored == [d.snap] and d.moved == [(10, 20)] and d.released == 2
+    assert keys_of(rec.batches[0]) == [(api.VK_CAPITAL, False), (api.VK_CAPITAL, True)]
+
+
+def test_desktop_state_restored_warns_instead_of_failing(rec: SendRecorder, monkeypatch: pytest.MonkeyPatch) -> None:
+    from tests.win32_harness import desktop_state_restored
+
+    d = Desktop(monkeypatch)
+    d.busy_restore, d.cursor = True, None  # clipboard held by another program; locked session
+    rec.script = [0]  # the CapsLock toggle is refused
+    with pytest.warns(UserWarning) as record, desktop_state_restored():
+        d.seq, d.caps = 8, 1
+    assert sorted(str(w.message).split(":")[1].strip() for w in record) == ["CapsLock not restored",
+                                                                             "clipboard not restored"]
+    assert d.moved == [] and d.released == 1
+    d.snap, d.busy_restore = None, False  # no snapshot (clipboard busy at the start): never written back
+    with desktop_state_restored():
+        d.seq = 9
+    assert d.restored == []

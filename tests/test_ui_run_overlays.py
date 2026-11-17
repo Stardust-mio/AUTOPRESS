@@ -235,8 +235,8 @@ def test_countdown_cancel_and_restart(qtbot: object) -> None:
 
 def test_preview_overlay_shows_marks_and_hides_itself(qtbot: object) -> None:
     ov = overlays.PreviewOverlay()
-    marks = [PreviewMark(0, "a", PreviewKind.POINT, (100, 100, 1, 1), "1 點擊位置", True),
-             PreviewMark(2, "b", PreviewKind.REGION, (200, 200, 300, 100), "3 結果範圍", False),
+    marks = [PreviewMark(0, "a", PreviewKind.POINT, (100, 100, 1, 1), "點擊位置", True),
+             PreviewMark(2, "b", PreviewKind.REGION, (200, 200, 300, 100), "結果範圍", False),
              PreviewMark(3, "c", PreviewKind.POINT, (90000, 90000, 1, 1), "off screen", False)]
     ov.show_marks(marks, duration_ms=150)
     assert ov.is_visible() and len(ov.overlays) == 1

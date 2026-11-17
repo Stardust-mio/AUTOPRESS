@@ -110,19 +110,25 @@ def monitor_rects() -> list[Rect]:
 
 
 def failsafe_corner_text(rects: list[Rect] | None = None) -> str:
-    """Which corner counts on this monitor layout (status-bar tooltip, settings hint)."""
+    """Which corner counts on this monitor layout (status-bar tooltip, settings hint, help page).
+
+    Typography (UI review U30): each point sits in ONE pair of brackets right after the words
+    it belongs to - full-width 「（-1920, 0）」 in zh-TW, "(-1920, 0)" in English - never a
+    bracket inside a bracket. The "left-most screen" sentence is used only when that screen's
+    corner is the one corner that counts; otherwise every outer corner is listed."""
     rects = monitor_rects() if rects is None else rects
     corners = failsafe_corners(rects)
     if len(rects) <= 1:
         return tr("把滑鼠推到螢幕最左上角，就會立刻緊急停止。",
                   "Push the mouse into the top-left corner of the screen to stop at once.")
-    pts = "、".join(f"({x}, {y})" for x, y in corners)
-    pts_en = ", ".join(f"({x}, {y})" for x, y in corners)
+    n = len(rects)
     left = min(r[0] for r in rects)
-    if any(x == left for x, _y in corners) and left < 0:
-        return tr(f"你有 {len(rects)} 個螢幕：要推到「最左邊那個螢幕」的左上角才算（座標 {pts}），"
-                  "主螢幕的左上角不算。",
-                  f"You have {len(rects)} screens: push the mouse into the top-left corner of the LEFT-most "
-                  f"screen (at {pts_en}); the primary screen's corner does not count.")
-    return tr(f"你有 {len(rects)} 個螢幕：算數的角落是 {pts}（桌面外側的左上角）。",
-              f"You have {len(rects)} screens: the corners that count are {pts_en} (outer top-left corners).")
+    if len(corners) == 1 and corners[0][0] == left and left < 0:
+        x, y = corners[0]
+        return tr("你有 {n} 個螢幕：要推到「最左邊那個螢幕」的左上角（{x}, {y}）才算，主螢幕的左上角不算。",
+                  "You have {n} screens: push the mouse into the top-left corner of the left-most screen, "
+                  "at ({x}, {y}); the primary screen's corner does not count.").format(n=n, x=x, y=y)
+    pts = tr("、", " or ").join(tr("（{x}, {y}）", "({x}, {y})").format(x=x, y=y) for x, y in corners)
+    return tr("你有 {n} 個螢幕：要推到桌面外側的左上角才算，位置是{pts}。",
+              "You have {n} screens: push the mouse into an outer top-left corner of the desktop, at {pts}.").format(
+        n=n, pts=pts)

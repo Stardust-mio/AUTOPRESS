@@ -7,15 +7,16 @@ privacy.
 
 The texts live in help_content.py (zh-TW + English). The failsafe section draws the user's own
 monitor layout and marks the outer top-left corner(s) that count (``models.failsafe_corners``).
+The table of contents scrolls to a section and keeps the entry of the section in view checked.
 """
 
 from __future__ import annotations
 
 from typing import Any
 
-from PyQt6.QtCore import QPointF, QRectF, QSize, Qt
+from PyQt6.QtCore import QEvent, QObject, QPointF, QRectF, QSize, Qt
 from PyQt6.QtGui import QPainter, QPaintEvent, QPen
-from PyQt6.QtWidgets import QHBoxLayout, QLabel, QScrollArea, QSizePolicy, QVBoxLayout, QWidget
+from PyQt6.QtWidgets import QButtonGroup, QHBoxLayout, QLabel, QScrollArea, QSizePolicy, QVBoxLayout, QWidget
 
 from ..context import AppContext
 from ..i18n import tr
@@ -100,13 +101,22 @@ class HelpPage(QWidget):
         t_lay.setContentsMargins(theme.PAGE_MARGINS[0], theme.PAGE_MARGINS[1] + 56, theme.SP[2], theme.PAGE_MARGINS[3])
         t_lay.setSpacing(2)
         t_lay.addWidget(label(tr("本頁內容", "On this page"), "caption"))
+        # the entry of the section in view is checked (the app style gives checked buttons the nav_active fill)
         self.toc_buttons: dict[str, Any] = {}
+        self.toc_group = QButtonGroup(self)
+        self.toc_group.setExclusive(True)
+        self._toc_pin: tuple[str, int] | None = None  # a clicked entry and the scroll position it led to
         for sec in SECTIONS:
             b = widgets.tool_button(sec["icon"], str(sec.get("toc", sec["title"])), "ghost")
             b.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+            b.setCheckable(True)
+            b.setProperty("toc", True)  # style hook for the current-section look
             b.clicked.connect(lambda _c=False, sid=sec["id"]: self.scroll_to(sid))
+            self.toc_group.addButton(b)
             t_lay.addWidget(b)
             self.toc_buttons[sec["id"]] = b
+        if self.toc_buttons:
+            next(iter(self.toc_buttons.values())).setChecked(True)
         t_lay.addStretch(1)
         outer.addWidget(toc)
 
@@ -120,7 +130,7 @@ class HelpPage(QWidget):
         col.setContentsMargins(theme.SP[3], theme.PAGE_MARGINS[1], theme.PAGE_MARGINS[2], theme.PAGE_MARGINS[3])
         col.setSpacing(theme.SP[4])
         col.addWidget(widgets.section_header(tr("說明", "Help"),
-                                             tr("安全守則、常見問題與緊急停止。", "Safety rules, common problems and the emergency stop.")))
+                                             tr("安全守則、疑難排解與緊急停止。", "Safety rules, troubleshooting and the emergency stop.")))
         for sec in SECTIONS:
             card = self._section(sec)
             self.sections[sec["id"]] = card
@@ -128,6 +138,11 @@ class HelpPage(QWidget):
         col.addStretch(1)
         self.scroll.setWidget(body)
         outer.addWidget(self.scroll, 1)
+        # the table of contents follows the body: scrolling moves it, layout changes resize it (an event
+        # filter, so building the page wraps none of the scroll area's own children)
+        self._body = body
+        body.installEventFilter(self)
+        self.scroll.installEventFilter(self)
         ctx.signals.settings_changed.connect(self._update_hotkeys)
         self._update_hotkeys()
 
@@ -146,7 +161,7 @@ class HelpPage(QWidget):
         return card
 
     def _paragraph(self, text: str, role: str = "secondary") -> QLabel:
-        lb = label(text, role)
+        lb = label(widgets.keep_quoted(text), role)  # a quoted button name never splits across lines
         lb.setWordWrap(True)
         lb.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         return lb
@@ -208,10 +223,53 @@ class HelpPage(QWidget):
         w = self.sections.get(section_id)
         if w is not None:
             self.scroll.verticalScrollBar().setValue(max(0, w.y() - theme.SP[3]))
+            if self.isVisible():  # keep the clicked entry checked even if its section cannot reach the top
+                self._toc_pin = (section_id, self._scroll_state()[0])
+                self._sync_toc()
+
+    def _scroll_state(self) -> tuple[int, int, int]:
+        """(position, maximum, viewport height) of the scrolled help text, read from the body: the
+        scroll area moves it to -position, and its height beyond the viewport is the maximum."""
+        view_h = self.scroll.maximumViewportSize().height()
+        return max(0, -self._body.y()), max(0, self._body.height() - view_h), view_h
+
+    def current_section(self) -> str:
+        """The id of the section in view: the last one whose top is above a reading line. The line runs
+        from just below the top of the viewport (page at the top) down to the end of the page (page
+        scrolled to the end), so short sections at the end, which never reach the top, still get a turn."""
+        value, maximum, view_h = self._scroll_state()
+        reach = float(theme.SP[3] + 1)  # scroll_to leaves SP[3] above a section
+        if maximum > 0:
+            reach += value / maximum * max(0.0, view_h - reach)
+        current = next(iter(self.sections), "")
+        for sid, w in self.sections.items():
+            if w.y() <= value + reach:
+                current = sid
+        return current
+
+    def _sync_toc(self) -> None:
+        """Check the table-of-contents entry of the section in view (layout positions are only valid
+        while the page is shown)."""
+        if not self.isVisible():
+            return
+        value = self._scroll_state()[0]
+        if self._toc_pin is not None and self._toc_pin[1] != value:
+            self._toc_pin = None  # scrolled since the click
+        sid = self._toc_pin[0] if self._toc_pin is not None else self.current_section()
+        b = self.toc_buttons.get(sid)
+        if b is not None and not b.isChecked():
+            b.setChecked(True)
+
+    def eventFilter(self, obj: QObject | None, event: QEvent | None) -> bool:
+        if (event is not None and event.type() in (QEvent.Type.Move, QEvent.Type.Resize)
+                and obj in (self._body, self.scroll)):
+            self._sync_toc()  # scrolled (the body moved) or the layout / window size changed
+        return super().eventFilter(obj, event)
 
     def showEvent(self, event: object) -> None:  # refresh the monitor layout each time the page shows
         super().showEvent(event)  # type: ignore[arg-type]
         if hasattr(self, "failsafe_map"):
             self.failsafe_map.set_rects(monitor_rects())
             self._update_hotkeys()
+        self._sync_toc()
 

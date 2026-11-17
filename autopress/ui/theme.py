@@ -18,6 +18,10 @@ How the look is built (SPEC 6.2):
   ``QFrame[frameRole=card|banner|sidebar|statusbar|toast|minibar|segmented|inset|panel]``
   (the prototype's object names ``#Card #Banner #Sidebar #StatusBar #Toast #MiniBar
   #Segmented`` work too). Banner tones: ``QFrame[frameRole="banner"][tone="warning"]`` etc.
+  ``QScrollArea[frameRole="inset"]`` is a framed canvas (inset fill, 1 px border, 4 px padding
+  so the content never covers the rounded corners); ``QToolButton[toc="true"]`` (checkable
+  table-of-contents entries) shows the checked entry like the sidebar's active item: soft
+  fill, no accent border. Scroll-area corners (``QAbstractScrollArea::corner``) are blank.
 * Combo-box and spin-box arrows are small SVG files written once per colour into
   ``<data folder>/cache/ui`` (QSS needs a file for ``image:``; the files are 300 bytes).
 """

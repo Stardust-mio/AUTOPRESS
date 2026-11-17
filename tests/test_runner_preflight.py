@@ -344,7 +344,9 @@ def test_preview_marks_in_step_order() -> None:
     assert kinds == [(0, PreviewKind.SEARCH_REGION), (1, PreviewKind.POINT), (2, PreviewKind.REGION),
                      (3, PreviewKind.SEARCH_REGION), (3, PreviewKind.FALLBACK_POINT), (4, PreviewKind.REGION)]
     assert marks[1].rect == (*world.center(world.box_rects()[0]), 1, 1)
-    assert marks[1].label == "2 點一下序號輸入框" and marks[1].step_id == p.steps[1].id
+    # the step title only: the overlay's badge shows the number (step_index + 1)
+    assert marks[1].label == "點一下序號輸入框" and marks[1].step_id == p.steps[1].id
+    assert all(m.label == p.steps[m.step_index].display_title() for m in marks)
     assert all(m.ok for m in marks)
     assert not world.actions
 

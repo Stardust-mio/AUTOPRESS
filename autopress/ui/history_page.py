@@ -10,12 +10,34 @@ of the record's game. Evidence paths are relative to the data folder (SPEC 5.8).
 from __future__ import annotations
 
 import logging
+import math
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from PyQt6.QtCore import QAbstractTableModel, QItemSelectionModel, QModelIndex, QRectF, Qt, QTimer, QUrl
-from PyQt6.QtGui import QDesktopServices, QGuiApplication, QKeySequence, QPainter, QPixmap, QShortcut
+from PyQt6.QtCore import (
+    QAbstractTableModel,
+    QEvent,
+    QItemSelectionModel,
+    QModelIndex,
+    QRectF,
+    QSize,
+    QSizeF,
+    Qt,
+    QTimer,
+    QUrl,
+)
+from PyQt6.QtGui import (
+    QDesktopServices,
+    QFontMetrics,
+    QGuiApplication,
+    QImage,
+    QKeySequence,
+    QPainter,
+    QPaintEvent,
+    QPixmap,
+    QShortcut,
+)
 from PyQt6.QtWidgets import (
     QAbstractItemView,
     QDialog,
@@ -25,6 +47,7 @@ from PyQt6.QtWidgets import (
     QLabel,
     QMenu,
     QScrollArea,
+    QSizePolicy,
     QStackedWidget,
     QTableView,
     QVBoxLayout,
@@ -40,7 +63,7 @@ from ..storage import StorageError
 from . import theme, widgets
 from .codes_common import fit_wrapped_label, subscribe_weak
 from .codes_model import ROLE_ITEM, ROLE_STATUS, CellDelegate, StatusDelegate
-from .codes_paint import code_column_width, paint_code, status_column_width
+from .codes_paint import CELL_PAD, code_column_width, paint_code, status_column_width
 
 log = logging.getLogger(__name__)
 
@@ -54,6 +77,31 @@ STATUS_CHOICES: tuple[CodeStatus, ...] = (
     CodeStatus.COOLDOWN, CodeStatus.FAILED, CodeStatus.REVIEW, CodeStatus.SKIPPED)
 THUMB_W, THUMB_H = 60, 30
 _KEEP = object()  # set_filters: leave this filter as it is
+
+
+def thumb_source(pm: QPixmap) -> QPixmap:
+    """The part of an evidence crop the 60 x 30 thumbnail shows: a crop wider than 2:1 is cut to a
+    2:1 window starting just left of its content (the first column that differs from the corner
+    colour), where a result message begins - squeezed whole into the cell, a 760 x 140 crop was a
+    blank white strip 11 px tall."""
+    w, h = pm.width(), pm.height()
+    want = round(h * THUMB_W / THUMB_H)
+    if w <= want or h <= 0:
+        return pm
+    try:
+        import numpy as np
+
+        img = pm.toImage().convertToFormat(QImage.Format.Format_RGB32)
+        ptr = img.constBits()
+        ptr.setsize(img.sizeInBytes())
+        a = np.frombuffer(ptr, np.uint8).reshape(img.height(), img.bytesPerLine())[:, : w * 4].reshape(h, w, 4)
+        diff = np.abs(a[:, :, :3].astype(np.int16) - a[0, 0, :3].astype(np.int16)).max(axis=2)
+        cols = np.flatnonzero((diff > 40).any(axis=0))
+        left = max(0, int(cols[0]) - 8) if cols.size else 0
+    except Exception:  # noqa: BLE001 - a thumbnail must never fail: then the crop's left end
+        left = 0
+    left = min(left, w - want)
+    return pm.copy(left, 0, want, h)
 
 
 def format_time(iso: str) -> str:
@@ -114,8 +162,8 @@ class HistoryTableModel(QAbstractTableModel):
             f = evidence_file(rec.evidence_path)
             pm = QPixmap(str(f)) if f is not None else QPixmap()
             self._thumbs[rec.evidence_path] = (
-                None if pm.isNull() else pm.scaled(THUMB_W * 2, THUMB_H * 2, Qt.AspectRatioMode.KeepAspectRatio,
-                                                   Qt.TransformationMode.SmoothTransformation))
+                None if pm.isNull() else thumb_source(pm).scaled(
+                    THUMB_W * 2, THUMB_H * 2, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
         return self._thumbs[rec.evidence_path]
 
     def data(self, index: QModelIndex, role: int = Qt.ItemDataRole.DisplayRole) -> Any:
@@ -173,8 +221,58 @@ class EvidenceDelegate(CellDelegate):
         painter.drawRoundedRect(target.adjusted(-0.5, -0.5, 0.5, 0.5), 3, 3)
 
 
+class EvidenceImage(QWidget):
+    """An evidence crop at its natural size inside a 1 px frame, at the top left. The crop holds screen
+    pixels, so each image pixel is drawn on one screen pixel: as large as it was on screen and sharp at any
+    Windows scaling. The frame keeps a white crop visible on the light dialog. Colours are read at paint time."""
+
+    FRAME = 1
+
+    def __init__(self, pixmap: QPixmap, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self._pixmap = pixmap
+        self.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum)
+        self.setAccessibleName(tr("證據圖片", "Evidence image"))
+
+    def pixmap(self) -> QPixmap:
+        return self._pixmap
+
+    def image_size(self) -> QSizeF:
+        """The crop's size in device-independent pixels on this widget's screen."""
+        dpr = self.devicePixelRatioF() or 1.0
+        return QSizeF(self._pixmap.width() / dpr, self._pixmap.height() / dpr)
+
+    def sizeHint(self) -> QSize:
+        if self._pixmap.isNull():
+            return QSize(0, 0)
+        s = self.image_size()
+        return QSize(math.ceil(s.width()) + 2 * self.FRAME, math.ceil(s.height()) + 2 * self.FRAME)
+
+    def minimumSizeHint(self) -> QSize:
+        return self.sizeHint()  # the scroll area scrolls instead of squeezing the image
+
+    def event(self, event: QEvent | None) -> bool:
+        if event is not None and event.type() == QEvent.Type.DevicePixelRatioChange:
+            self.updateGeometry()  # another screen scaling: another natural size
+        return super().event(event)
+
+    def paintEvent(self, _event: QPaintEvent | None) -> None:
+        if self._pixmap.isNull():
+            return
+        s, f = self.image_size(), self.FRAME
+        p = QPainter(self)
+        p.fillRect(QRectF(0, 0, s.width() + 2 * f, s.height() + 2 * f), theme.color("border_strong"))
+        # no SmoothPixmapTransform: the target is the crop's own size in device pixels, a 1:1 copy
+        p.drawPixmap(QRectF(f, f, s.width(), s.height()), self._pixmap, QRectF(self._pixmap.rect()))
+        p.end()
+
+
 class EvidenceDialog(QDialog):
-    """The evidence crop of one attempt at its natural size (scrolls when larger)."""
+    """The evidence crop of one attempt at its natural size, framed (scrolls when larger), with the
+    attempt's time."""
+
+    MAX_VIEW = QSize(960, 560)
+    """Largest image area before the dialog scrolls."""
 
     def __init__(self, record: AttemptRecord, path: Path, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -187,18 +285,18 @@ class EvidenceDialog(QDialog):
         head.addWidget(widgets.label(record.code, "mono"))
         head.addWidget(widgets.StatusChip(record.status))
         head.addStretch(1)
-        head.addWidget(widgets.label(format_time(record.finished_at), "muted"))
+        when = format_time(record.finished_at or record.started_at)  # the same time as the table row
+        self.time_label = widgets.label(when, "muted") if when else None
+        if self.time_label is not None:
+            head.addWidget(self.time_label)
         lay.addLayout(head)
-        image = QLabel()
-        image.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        pm = QPixmap(str(path))
-        image.setPixmap(pm)
-        image.setAccessibleName(tr("證據圖片", "Evidence image"))
-        scroll = QScrollArea()
-        scroll.setWidget(image)
+        self.image = EvidenceImage(QPixmap(str(path)))
+        self._scroll = scroll = QScrollArea()
+        scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+        scroll.setWidget(self.image)
         scroll.setWidgetResizable(True)
-        scroll.setMinimumSize(min(pm.width() + 24, 960), min(pm.height() + 24, 560))
         lay.addWidget(scroll, 1)
+        self._fit_view()
         if record.message:
             msg = widgets.label(record.message, "secondary")
             msg.setWordWrap(True)
@@ -213,6 +311,23 @@ class EvidenceDialog(QDialog):
         close.clicked.connect(self.accept)
         row.addWidget(close)
         lay.addLayout(row)
+
+    def _fit_view(self) -> None:
+        """The image area shows the whole crop up to MAX_VIEW, measured with the scaling of the
+        screen the dialog is on (again when it is shown or moved to another screen)."""
+        hint, cap = self.image.sizeHint(), self.MAX_VIEW
+        bar = 12  # a scroll bar (10 px + margins in the app style) when the other side is capped
+        self._scroll.setMinimumSize(min(hint.width(), cap.width()) + (bar if hint.height() > cap.height() else 0),
+                                    min(hint.height(), cap.height()) + (bar if hint.width() > cap.width() else 0))
+
+    def showEvent(self, event: Any) -> None:  # noqa: N802
+        self._fit_view()
+        super().showEvent(event)
+
+    def event(self, event: QEvent | None) -> bool:
+        if event is not None and event.type() == QEvent.Type.DevicePixelRatioChange:
+            self._fit_view()
+        return super().event(event)
 
 
 class HistoryPage(QWidget):
@@ -428,7 +543,7 @@ class HistoryPage(QWidget):
         width = code_column_width(r.code for r in records)
         if width != self._table.columnWidth(COL_CODE):
             self._table.setColumnWidth(COL_CODE, width)
-            self._fit_columns()
+        self._fit_columns()  # the game / profile columns follow their entries
         all_records = self.ctx.history.records()
         total = len(all_records)
         ok = sum(1 for r in all_records if r.status is CodeStatus.SUCCESS)
@@ -446,14 +561,20 @@ class HistoryPage(QWidget):
         self._fit_timer.start()
 
     def _fit_columns(self) -> None:
-        """Game and profile columns give up width on narrow windows so the message and evidence
-        columns stay visible (the table never scrolls sideways)."""
+        """Game and profile columns are as wide as their longest entry (at most WIDTHS), and give up
+        width on narrow windows, so the message column gets the rest (fewer cut-off messages) and the
+        evidence column stays visible (the table never scrolls sideways)."""
         vw = self._table.viewport().width()
         fixed = sum(self._table.columnWidth(c) for c in (COL_TIME, COL_CODE, COL_RESULT, COL_EVIDENCE))
         each = int(max(72, min(WIDTHS[COL_GAME], (vw - fixed - 120) / 2)))
+        header = self._table.horizontalHeader()
+        fm = QFontMetrics(theme.font(theme.FS_BODY))  # what CellDelegate paints
         for col in (COL_GAME, COL_PROFILE):
-            if self._table.columnWidth(col) != each:
-                self._table.setColumnWidth(col, each)
+            texts = (str(self._model.data(self._model.index(row, col)) or "") for row in range(self._model.rowCount()))
+            need = max([header.sectionSizeHint(col)] + [fm.horizontalAdvance(t) + 2 * CELL_PAD + 4 for t in texts])
+            width = max(72, min(each, need))
+            if self._table.columnWidth(col) != width:
+                self._table.setColumnWidth(col, width)
 
     def records_shown(self) -> list[AttemptRecord]:
         return self._model.records()

@@ -3,14 +3,15 @@
 
 They inject real keyboard / mouse input, but only into AutoPress's own test windows
 (tests/win32_target_app.py processes and windows of this test process), always through an
-InjectGuard (foreground check on). The user's clipboard, CapsLock state and cursor position are
-restored after every test, and every test ends with release_all_modifiers(). Run them alone,
-with nobody touching the PC (touching it trips the user-input guard and fails the test):
+InjectGuard (foreground check on). After every test, tests/conftest.py releases every key still
+held (release_all_modifiers()) and restores the user's clipboard, CapsLock state and cursor
+position. Run them alone, with nobody touching the PC (touching it trips the user-input guard and
+fails the test):
 
     AUTOPRESS_REALINPUT=1 .venv/Scripts/python.exe -m pytest -q -m realinput tests/test_win32_realinput.py -rw
 
 The exclude_from_capture measurement (SPEC 11.10) is reported as a warning (``-rw`` lists it).
-NOT RUN YET: written on 2026-11-17 while the PC was locked (see the G3 report).
+Run on 2026-11-17 by a fresh verifier: all 26 tests then in this module passed, twice in a row.
 """
 
 from __future__ import annotations
@@ -27,6 +28,7 @@ from autopress.win32 import api, clipboard, windows
 from autopress.win32 import input as inp
 from autopress.win32.hotkeys import GlobalHotkeys
 from tests.win32_harness import TargetApp, center
+from tests.win32_harness import caps_lock_on as caps_on
 from tests.win32_helpers import HWND_TOPMOST, SW_MINIMIZE, SWP_NOACTIVATE, SetWindowPos, ShowWindow
 
 pytestmark = pytest.mark.realinput
@@ -49,9 +51,10 @@ def key_down(vk: int) -> bool:
 
 def button_released(vk: int, timeout_s: float = 0.5) -> bool:
     """True once GetAsyncKeyState shows the mouse button ``vk`` up (within ``timeout_s``). SendInput
-    returns before Windows has processed injected MOUSE events: right after a button-up was inserted
-    the button still read "down" in 17 of 40 measurements and "up" in all 40 within 0.75 ms
-    (keyboard keys read "up" at once, 40 of 40; 2026-11-17). A stuck button never reads up."""
+    returns before Windows has processed injected MOUSE events, so right after a button-up was
+    inserted the button can still read "down" for a few ms (2026-11-17, two runs of 40: 17 and 6 first
+    reads "down", every one "up" within 2 ms; keyboard keys read "up" at once). A stuck button never
+    reads up."""
     deadline = time.monotonic() + timeout_s
     while key_down(vk):
         if time.monotonic() > deadline:
@@ -60,29 +63,8 @@ def button_released(vk: int, timeout_s: float = 0.5) -> bool:
     return True
 
 
-def caps_on() -> bool:
-    return bool(api.GetKeyState(api.VK_CAPITAL) & 1)
-
-
-@pytest.fixture(autouse=True)
-def user_state(qapp: object) -> Iterator[None]:
-    """QApplication first (per-monitor-v2: physical coordinates); afterwards restore what these
-    tests touch: held keys, CapsLock, the clipboard (all formats) and the cursor position."""
-    try:
-        snap = clipboard.snapshot()
-    except inp.ClipboardBusy:
-        snap = None
-    caps = caps_on()
-    cursor = api.cursor_pos()
-    yield
-    inp.release_all_modifiers()
-    if caps_on() != caps:
-        inp._send([inp._vk_event(api.VK_CAPITAL, False), inp._vk_event(api.VK_CAPITAL, True)], "capslock")
-        time.sleep(0.15)
-    if snap is not None:
-        clipboard.restore(snap)
-    if cursor is not None:
-        api.SetCursorPos(*cursor)
+# tests/conftest.py (_realinput_user_state) creates the QApplication first (per-monitor-v2: physical
+# coordinates) and, after every test, releases held keys and restores CapsLock, clipboard and cursor.
 
 
 def focus(t: TargetApp) -> inp.InjectGuard:
@@ -189,6 +171,35 @@ def test_clear_recipes_empty_the_field(target: TargetApp, method: ClearMethod) -
         inp.press_keys([api.VK_RIGHT], guard)  # caret inside the text
     inp.clear_field(guard, method, backspaces=25)
     assert target.wait_text("") == ""
+
+
+def test_unicode_text_after_clear_field_keeps_its_first_characters_with_an_ime(target_ime: TargetApp) -> None:
+    """Regression (2026-11-17): in a Qt window with an IME, KEYEVENTF_UNICODE characters typed right
+    after clear_field's Ctrl+A + Backspace overtook those keys and the clear deleted the first
+    characters of the code (30/30 without a gap). type_text now waits TEXT_AFTER_KEYS_SETTLE_S after
+    our last key: checked here on a real IME window (the ``target`` fixture has no IME window after
+    ImmDisableIME, so it never waits). The field is never empty before a clear, so text that a late
+    clear would delete cannot pass for the code first."""
+    guard = focus(target_ime)
+    if not inp._has_ime_window(target_ime.hwnd):
+        pytest.skip("the target window has no IME window on this PC")
+    focus_edit(target_ime, guard)
+    inp.type_text("OLD-0000", guard, key_delay_ms=15)
+    assert target_ime.wait_text("OLD-0000") == "OLD-0000"
+    slept: list[float] = []
+
+    def sleep(seconds: float) -> None:
+        slept.append(seconds)
+        time.sleep(seconds)
+
+    for code in ("AB12-CD34", "EF56-GH78", "JK90-LM12", "NP34-QR56", "ST78-UV90"):
+        slept.clear()
+        inp.clear_field(guard)
+        inp.type_text(code, guard, key_delay_ms=15, sleep=sleep)
+        # the settle came first (this window has an IME window), then a key delay after each character but the last
+        assert len(slept) == len(code) and 0 < slept[0] <= inp.TEXT_AFTER_KEYS_SETTLE_S, slept
+        assert target_ime.wait_text(code) == code
+    assert inp.held_by_us() == []
 
 
 # ----------------------------------------------------------------------------- mouse

@@ -4,7 +4,8 @@ duplicate, delete) + editor (name, game - an editable combo of known game names 
 near-duplicate warning -, target window, code format, coordinate mode, setup checklist banner,
 step list, step editor, run policy, keywords) with explicit 儲存, dirty marker and a Save /
 Discard / Cancel prompt (and a warning before saving a profile from a newer version); template
-gallery when there are no profiles; buttons 預覽點位 (PreviewOverlay), 測試此步驟
+gallery when there are no profiles (the empty list says 「還沒有設定檔」 and points to it); the four form
+cards share one label column; buttons 預覽點位 (PreviewOverlay), 測試此步驟
 (RunSession.test_step: dry run by default; a real test shows the countdown, registers the stop
 hotkey, offers 停止測試 and warns when the step submits the sample code), 設為使用中.
 
@@ -26,6 +27,7 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QKeySequence, QShortcut
 from PyQt6.QtWidgets import (
     QCheckBox,
+    QFormLayout,
     QHBoxLayout,
     QListWidget,
     QListWidgetItem,
@@ -50,14 +52,18 @@ from ..models import (
     to_dict,
 )
 from . import profiles_dialogs as dialogs
+from . import theme
 from . import widgets as w
 from .keywords_editor import KeywordsEditor
-from .profiles_editor import BasicsCard, FormatCard, PolicyCard, TargetCard, card
+from .profiles_editor import BasicsCard, FormatCard, PolicyCard, TargetCard, align_form_labels, card
 from .profiles_actions import ProfileActions, ask_open_path, ask_save_path, blank_profile
 from .profiles_steptest import StepTestController
 from .step_editor import StepEditor, StepListWidget
 
 log = logging.getLogger(__name__)
+
+STEP_LIST_W = 300  # step list width while the page has room
+STEP_LIST_MIN_W = 240  # ... and in the smallest window
 
 
 def _snapshot(p: Profile | None) -> dict[str, Any] | None:
@@ -76,8 +82,10 @@ class _ProfileRow(QWidget):
         lay.setSpacing(0)
         top = QHBoxLayout()
         top.addWidget(w.label(profile.name or tr("（未命名）", "(untitled)"), "body"), 1)
+        self.badge = None
         if active:
-            top.addWidget(w.label(tr("● 使用中", "● Active"), "caption"))
+            self.badge = w.label(tr("● 使用中", "● Active"), "success")  # green: in use (grey read as inactive, U35)
+            top.addWidget(self.badge)
         lay.addLayout(top)
         sub = profile.game or tr("未指定遊戲", "No game")
         if profile.missing_setup() or profile.target.is_empty():
@@ -113,6 +121,13 @@ class ProfilesPage(ProfileActions, QWidget):
         self.editor_page = QScrollArea()
         self.editor_page.setWidgetResizable(True)
         self.editor_page.setFrameShape(QScrollArea.Shape.NoFrame)
+        # No sideways scrolling (U4): every card of this page fits the page width down to the smallest
+        # window (1100 x 700) - long texts wrap or elide, a narrow step form puts fields under their
+        # labels, the keywords editor's fuzzy line wraps, combos shrink. Measured with real fonts at
+        # 100 / 125 / 150 % in zh-TW and English: 0 px overflow, so the bar never shows. It stays "as
+        # needed" (not off): a case nobody measured (another font, a longer label) scrolls instead of
+        # cutting off the right edge; the blank corner rule keeps the fitting case unchanged.
+        self.editor_page.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self.editor_page.setWidget(self._build_editor())
         self.stack.addWidget(self.editor_page)
 
@@ -154,6 +169,7 @@ class ProfilesPage(ProfileActions, QWidget):
         self.list.currentRowChanged.connect(self._on_list_row)
         self.list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.list.customContextMenuRequested.connect(lambda pos: self._list_menu(self.list.mapToGlobal(pos)))
+        self.list_empty = self._build_list_empty()
         lay.addWidget(self.list, 1)
         bottom = QHBoxLayout()
         self.active_btn = w.push_button(tr("設為使用中", "Set as active"), "secondary", "check")
@@ -171,14 +187,40 @@ class ProfilesPage(ProfileActions, QWidget):
         self._profiles: list[Profile] = []
         return left
 
+    def _build_list_empty(self) -> QWidget:
+        """Empty state drawn inside the (empty) profile list, on its own background (U21): what
+        to do first - the template gallery on the right, or 匯入."""
+        box = QWidget()
+        v = QVBoxLayout(box)
+        v.setContentsMargins(0, 0, 0, 0)
+        v.setSpacing(6)
+        v.addWidget(w.icon_label("profiles", "text_muted", 28), 0, Qt.AlignmentFlag.AlignHCenter)
+        title = w.label(tr("還沒有設定檔", "No profiles yet"), "strong")
+        title.setAlignment(Qt.AlignmentFlag.AlignHCenter)
+        v.addWidget(title)
+        self.list_empty_hint = w.label(tr("從右邊選一個範本開始，或按「匯入」載入別人分享的設定檔。",
+                                          "Pick a template on the right, or click Import to load a profile someone shared."),
+                                       "muted")
+        self.list_empty_hint.setWordWrap(True)
+        self.list_empty_hint.setAlignment(Qt.AlignmentFlag.AlignHCenter)
+        v.addWidget(self.list_empty_hint)
+        holder = QVBoxLayout(self.list.viewport())  # the list keeps its own panel look around the text
+        holder.setContentsMargins(20, 40, 20, 20)
+        holder.addWidget(box)
+        holder.addStretch(1)
+        box.hide()
+        return box
+
     def _build_editor(self) -> QWidget:
         body = QWidget()
         lay = QVBoxLayout(body)
         lay.setContentsMargins(0, 0, 8, 0)
         lay.setSpacing(16)
         head = QHBoxLayout()
+        head.setSpacing(theme.SP[2])  # like the Codes page header; 16 px gaps made the English row too wide
         col = QVBoxLayout()
-        self.title = w.label("", "display")
+        self.title = w.ElidedLabel("")  # a long profile name elides instead of pushing 儲存 off the page
+        self.title.setProperty("role", "display")
         col.addWidget(self.title)
         self.dirty_label = w.label(tr("● 有未儲存的變更", "● Unsaved changes"), "caption")
         self.dirty_label.hide()
@@ -215,8 +257,11 @@ class ProfilesPage(ProfileActions, QWidget):
                                      tr("每筆序號都會依序執行這些步驟。左邊選步驟，右邊改設定。",
                                         "Every code runs these steps in order. Select a step on the left, edit it on the right."))
         split = QSplitter(Qt.Orientation.Horizontal)
+        split.setChildrenCollapsible(False)
         self.step_list = StepListWidget(self.ctx)
-        self.step_list.setMinimumWidth(300)
+        # 300 px at the default window size (setSizes below), down to 240 px in a small window so
+        # the step form keeps room beside it (U4: the form had to scroll sideways)
+        self.step_list.setMinimumWidth(STEP_LIST_MIN_W)
         self.step_list.setMinimumHeight(420)
         self.step_list.currentChanged.connect(self._on_step_selected)
         self.step_list.stepsChanged.connect(self._on_steps_changed)
@@ -227,25 +272,38 @@ class ProfilesPage(ProfileActions, QWidget):
         self.step_editor = StepEditor(self.ctx)
         self.step_editor.stepChanged.connect(self._on_step_edited)
         rlay.addWidget(self.step_editor, 1)
-        trow = QHBoxLayout()
         self.test_btn = w.push_button(tr("測試此步驟", "Test this step"), "secondary", "flask")
         self.test_btn.setToolTip(tr("預設只定位與辨識、不送出任何輸入", "By default it only locates and reads; no input is sent"))
         self.test_btn.clicked.connect(lambda: self.test_step())
-        trow.addWidget(self.test_btn)
         self.real_check = QCheckBox(tr("真的執行（會送出輸入）", "Run for real (sends input)"))
-        trow.addWidget(self.real_check)
+        self.real_check.setFixedHeight(theme.CONTROL_H)  # centred on the buttons beside it
         self.stop_test_btn = w.push_button(tr("停止測試", "Stop test"), "danger", "stop")
         self.stop_test_btn.clicked.connect(self._steptest.stop)
         self.stop_test_btn.hide()
-        trow.addWidget(self.stop_test_btn)
-        trow.addStretch(1)
-        rlay.addLayout(trow)
+        btns = QWidget()
+        bl = QHBoxLayout(btns)
+        bl.setContentsMargins(0, 0, 0, 0)
+        bl.addWidget(self.test_btn)
+        bl.addWidget(self.stop_test_btn)
+        # [測試此步驟] [☐ 真的執行] on one line; the check box moves under the button when narrow
+        self.test_row = QFormLayout()
+        self.test_row.setContentsMargins(0, 0, 0, 0)
+        self.test_row.setRowWrapPolicy(QFormLayout.RowWrapPolicy.WrapLongRows)
+        self.test_row.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.FieldsStayAtSizeHint)
+        self.test_row.setLabelAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+        self.test_row.setHorizontalSpacing(12)
+        self.test_row.setVerticalSpacing(4)
+        self.test_row.addRow(btns, self.real_check)
+        rlay.addLayout(self.test_row)
         self.test_result = w.label("", "muted")
         self.test_result.setWordWrap(True)
         rlay.addWidget(self.test_result)
         split.addWidget(right)
         split.setStretchFactor(1, 1)
+        split.setSizes([STEP_LIST_W, 10_000])  # the list keeps 300 px when there is room
+        self.steps_split = split
         steps_lay.addWidget(split)
+        self.steps_card = steps_card
         lay.addWidget(steps_card)
         self.policy_card = PolicyCard(self._changed)
         lay.addWidget(self.policy_card)
@@ -255,6 +313,9 @@ class ProfilesPage(ProfileActions, QWidget):
         kw_lay.addWidget(self.keywords)
         lay.addWidget(kw_card)
         lay.addStretch(1)
+        # one label column for the four form cards: their fields start at the same x (U35)
+        self.label_width = align_form_labels([c.form for c in (self.basics, self.target_card, self.format_card,
+                                                              self.policy_card)])
         return body
 
     # ================================================================ list
@@ -277,6 +338,7 @@ class ProfilesPage(ProfileActions, QWidget):
             if p.id == current:
                 self.list.setCurrentItem(item)
         self.list.blockSignals(False)
+        self.list_empty.setVisible(not self._profiles)
         has = self._profile is not None
         for b in (self.active_btn, self.export_btn, self.dup_btn, self.del_btn):
             b.setEnabled(has)

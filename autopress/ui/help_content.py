@@ -20,7 +20,7 @@ SECTIONS: list[dict[str, Any]] = [
         "icon": "logo",
         "title": T("這是什麼", "What AutoPress is"),
         "blocks": [
-            ("p", T("AutoPress 會照你設定的步驟，把一批遊戲兌換碼一筆接一筆自動輸入、送出，並記下每筆結果。"
+            ("p", T("AutoPress 會照你設定的步驟，把一批遊戲序號一筆接一筆自動輸入、送出，並記下每筆結果。"
                     "它只是代替你手動輸入序號，不會修改遊戲。",
                     "AutoPress types a batch of game redeem codes for you, one after another, following the steps "
                     "you set up, and records every result. It only replaces typing the codes by hand; it never "
@@ -33,8 +33,8 @@ SECTIONS: list[dict[str, Any]] = [
                   "template."),
                 T("執行：開始前先檢查清單並倒數；執行中可暫停、繼續、停止。",
                   "Run: a checklist and a countdown come first; pause, resume or stop at any time."),
-                T("紀錄：每筆的結果、訊息與截圖；已兌換過的序號之後會自動略過。",
-                  "History: every result with its message and screenshot; redeemed codes are skipped later."),
+                T("紀錄：每筆的結果、訊息與證據截圖；已兌換過的序號之後會自動略過。",
+                  "History: every result with its message and evidence screenshot; redeemed codes are skipped later."),
             ]),
         ],
     },
@@ -74,10 +74,10 @@ SECTIONS: list[dict[str, Any]] = [
         "blocks": [
             ("item", T("遊戲以系統管理員身分執行", "The game runs as administrator"), [
                 ("p", T("Windows 會無聲擋掉一般權限程式對系統管理員程式的模擬輸入：看起來在打字，遊戲卻什麼都沒收到。"
-                        "開始前的檢查清單會提醒你，並提供「以系統管理員身分重新啟動 AutoPress」。",
+                        "開始前的檢查清單會提醒你，並提供「以系統管理員身分重新啟動」按鈕。",
                         "Windows silently drops simulated input from normal programs into programs that run as "
                         "administrator: it looks like typing, but the game receives nothing. The pre-run checklist "
-                        "warns you and offers \"Restart AutoPress as administrator\".")),
+                        "warns you and offers a \"Restart as administrator\" button.")),
                 ("p", T("以系統管理員身分執行時，無法從檔案總管把檔案拖曳進來，請改用「開啟檔案」。"
                         "如果你的帳戶沒有系統管理員權限，請改用遊戲的網頁兌換。",
                         "While AutoPress runs as administrator, files cannot be dragged in from Explorer; use Open "
@@ -136,8 +136,9 @@ SECTIONS: list[dict[str, Any]] = [
         "toc": T("快捷鍵與緊急停止", "Hotkeys & stop"),
         "blocks": [
             ("hotkeys",),
-            ("p", T("快捷鍵只在執行與真的測試步驟期間註冊，平常不會佔用這些按鍵；可在「設定」更換。",
-                    "The hotkeys are registered only during runs and real step tests; change them in Settings.")),
+            ("p", T("快捷鍵只在執行期間與「真的執行」的步驟測試時註冊，平常不會佔用這些按鍵；可在「設定」更換。",
+                    "The hotkeys are registered only during runs and step tests with 'Run for real'; change them "
+                    "in Settings.")),
             ("failsafe",),
             ("p", T("會鎖住滑鼠游標的遊戲（例如第一人稱射擊遊戲）沒辦法把滑鼠推到角落，請改按停止快捷鍵。",
                     "Games that lock the cursor (such as first-person shooters) cannot reach the corner: use the stop "

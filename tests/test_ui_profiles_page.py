@@ -302,10 +302,12 @@ def test_checklist_lists_missing_positions_with_set_up_buttons(page: ProfilesPag
     p.steps[1].params.point = None
     page.replace_step(1, p.steps[1])
     assert page.checklist.isVisibleTo(page)
+    from PyQt6.QtWidgets import QLabel
+
     texts = []
     for i in range(page.checklist_rows.count()):
         row = page.checklist_rows.itemAt(i).widget()
-        texts.append(" ".join(lb.text() for lb in row.findChildren(type(page.title))))
+        texts.append(" ".join(lb.text() for lb in row.findChildren(QLabel)))
     assert any("第 2 步" in t and "點擊位置" in t for t in texts)
     patch_target(monkeypatch, window(9, "chrome.exe", "兌換 - Google Chrome", client=(100, 50, 1280, 720)))
     monkeypatch.setattr(overlays, "pick", lambda kind, **kw: overlays.PickResult(kind=kind, point=(740, 410)))

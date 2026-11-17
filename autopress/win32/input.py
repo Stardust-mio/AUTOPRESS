@@ -10,10 +10,12 @@ Safety invariants (SPEC section 2.7):
   The module tracks what it holds; release_all_modifiers() also releases those.
 * Interrupted typing restores the clipboard snapshot (CLIPBOARD mode) and the target's IME
   state (VK mode) in ``finally`` as well (T28).
-* UNICODE characters never overtake our own earlier keys / clicks: into a window with an IME
-  they are typed only TEXT_AFTER_KEYS_SETTLE_S after the last key or mouse-button event (in a Qt
-  window the IME commit of a KEYEVENTF_UNICODE character arrived before keys sent just before it;
-  measured 2026-11-17).
+* UNICODE typing starts only TEXT_AFTER_KEYS_SETTLE_S after our last key or mouse-button event
+  when the target's thread has a default IME window (practically every window), so that its
+  characters do not overtake those keys / clicks (in a Qt window the IME commit of a
+  KEYEVENTF_UNICODE character arrived before keys sent just before it; measured 2026-11-17).
+  This is a mitigation, not a guarantee: it holds only when the target handles its input within
+  the settle (the constant's docstring has the limit and the remedies).
 * SendInput returning fewer events than sent (UAC prompt, locked screen, secure desktop)
   raises InputBlocked (T33).
 * Tick comparisons are wrap-safe: GetTickCount / GetLastInputInfo wrap after 49.7 days, so
@@ -102,14 +104,23 @@ IME_RESTORE_DELAY_S = 0.15  # before reopening it: let the target process the qu
 PASTE_MIN_DELAY_S = 0.05  # Ctrl+V -> clipboard restore never sooner (0 ms pasted the old content)
 DOUBLE_CLICK_MIN_HOLD_MS = 20  # an atomic 4-event double click is ignored by Qt; 20 ms holds worked
 TEXT_AFTER_KEYS_SETTLE_S = 0.2
-"""UNICODE typing into a window that has an IME starts at least this long after our last key /
-mouse-button event (interruptible wait). Measured 2026-11-17 on the zh-TW Bopomofo IME: in a Qt
-window the IME commit of a KEYEVENTF_UNICODE character reached the widget before ordinary keys sent
-just before it - characters typed right after clear_field's Ctrl+A + Backspace overtook them 30/30
-times and the clear deleted the first characters of the code. Those keys reached the widget 2-27 ms
-after SendInput (104 ms right after a click); with a 20 ms gap 1/30 still overtook, with 50 / 100 ms
-0/30. A native EDIT control kept the order without a gap (20/20). Clicks count too: a click that
-moves the focus must land before the text."""
+"""UNICODE typing starts at least this long after our last key / mouse-button event (an
+interruptible wait through ``sleep``) when the target's thread has a default IME window. While IMM
+is enabled - the normal case - practically every window has one (69 of 69 visible top-level windows
+on the test PC, 2026-11-17), so only a process that called ImmDisableIME, or a PC with IMM
+disabled, types without the wait.
+
+Why (measured 2026-11-17 with the zh-TW Bopomofo IME): a Qt window applies the IME commit of a
+KEYEVENTF_UNICODE character at once but delivers ordinary keys in its next event-loop pass, so
+characters typed right after clear_field's Ctrl+A + Backspace overtook those keys 30/30 times and
+the clear deleted the first characters of the code; with a 20 ms gap 1/30 still overtook, with
+50 / 100 ms 0/30. Clicks count too: a click that moves the focus must land before the text.
+
+Limit: the wait keeps the order only when the target handles our keys within it. A target whose
+GUI thread stalls for longer can still let characters overtake them (stalls of 300 ms every 400 ms:
+8-10 of 30 codes lost their first characters, and with focus-moving clicks text went into the
+previously focused box). CLIPBOARD and VK mode send only ordinary keys, which keep their order; a
+type_code step's verify_region catches a mistyped code before it is submitted."""
 MONITOR_CACHE_S = 2.0
 
 _monitor_cache: list[Any] = [0.0, []]  # [monotonic time, monitor rects]
@@ -413,14 +424,19 @@ def _vk_plan(ch: str, layout: Any, caps: bool) -> list[int]:
 
 
 def _has_ime_window(hwnd: int) -> bool:
-    """True when the thread of ``hwnd`` has a default IME window (characters may go through the IME)."""
+    """True when the thread of ``hwnd`` has a default IME window (ImmGetDefaultIMEWnd), so characters
+    may go through an IME. While IMM is enabled that is practically every window; False for a process
+    that called ImmDisableIME, on a PC with IMM disabled, and for 0 or a destroyed window."""
     return bool(hwnd) and bool(api.hwnd_int(api.ImmGetDefaultIMEWnd(int(hwnd))))
 
 
 def _settle_before_text(guard: InjectGuard, sleep: Sleep) -> None:
     """Wait until TEXT_AFTER_KEYS_SETTLE_S has passed since our last key / mouse-button event when the
-    target window has an IME - otherwise its first characters may arrive before those keys (the
-    constant's docstring has the measurement)."""
+    target's thread has a default IME window - otherwise its first characters may arrive before those
+    keys. This keeps the order only if the target handles the keys within the settle (the constant's
+    docstring has the measurement and the limit). A ``guard.hwnd`` of 0 or of a destroyed window skips
+    the wait; guard.check() then raises ForegroundLost unless allow_same_process accepts another window
+    of the target process (the runner builds a new guard when the target's HWND changes)."""
     since = seconds_since_key_or_button()
     if since is None or since >= TEXT_AFTER_KEYS_SETTLE_S or not _has_ime_window(guard.hwnd):
         return
@@ -499,8 +515,10 @@ def type_text(text: str, guard: InjectGuard, mode: TypingMode = TypingMode.UNICO
               restore_clipboard_ms: int = 300, sleep: Sleep = time.sleep) -> None:
     """Type ``text`` into the focused control of the guarded window.
     UNICODE: KEYEVENTF_UNICODE per UTF-16 unit, one atomic SendInput per character; when the
-    window has an IME, the first character waits until TEXT_AFTER_KEYS_SETTLE_S has passed since
-    our last key / mouse-button event (``sleep``), so it cannot overtake them.
+    target's thread has a default IME window (practically always), the first character waits until
+    TEXT_AFTER_KEYS_SETTLE_S has passed since our last key / mouse-button event (``sleep``), so that
+    it does not overtake them - in a target that handles its input within that time (the constant's
+    docstring has the limit).
     CLIPBOARD: snapshot the clipboard (all formats), set text (privacy formats), Ctrl+V, wait
     ``restore_clipboard_ms`` (>= 50; 0 ms pastes the old content), restore the snapshot.
     VK: VkKeyScanExW + scan codes with Shift and CapsLock compensation; when ``close_ime`` the

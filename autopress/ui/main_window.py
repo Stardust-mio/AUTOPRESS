@@ -20,7 +20,7 @@ from PyQt6.QtWidgets import QApplication, QHBoxLayout, QMainWindow, QStackedWidg
 
 from .. import APP_NAME, paths
 from ..context import PAGE_IDS, AppContext
-from ..i18n import tr
+from ..i18n import format_count, tr
 from ..models import CodeStatus, Profile, RunState, ThemeName
 from . import icons, theme
 from .shell_common import change_theme, failsafe_corner_text, open_folder
@@ -192,6 +192,9 @@ class MainWindow(QMainWindow):
         self._current = page_id
         self.stack.setCurrentWidget(self._pages[page_id])
         self.sidebar.set_current(page_id)
+        # the shown page may look the window up right now (the Run page does on show): the status
+        # bar looks too, so both say the same instead of the status bar lagging up to 2 s (U6)
+        self._refresh_target()
 
     def current_page(self) -> str:
         return self._current
@@ -207,9 +210,9 @@ class MainWindow(QMainWindow):
         return page_id in self._pages and not self._real.get(page_id, False)
 
     # -- badges / status ------------------------------------------------------------------
-    def set_badge(self, page_id: str, text: str) -> None:
-        """Count pill on a sidebar item ("" hides it)."""
-        self.sidebar.set_badge(page_id, text)
+    def set_badge(self, page_id: str, text: str, tooltip: str = "") -> None:
+        """Count pill on a sidebar item ("" hides it); ``tooltip`` says what the number counts."""
+        self.sidebar.set_badge(page_id, text, tooltip)
 
     def set_status(self, key: str, text: str, tone: str = "neutral", tooltip: str | None = None) -> None:
         """Status-bar item: key "target" | "ocr" | "guard" | "interval" | "run" (G5 creates them);
@@ -263,21 +266,33 @@ class MainWindow(QMainWindow):
             pass
 
     def _refresh_badges(self) -> None:
+        """Sidebar count pills (SPEC 6.3): 序號 = codes still to do (runnable + review), 設定檔 and
+        紀錄 = totals. Each pill's tooltip says what its number counts (UI review U43)."""
         ctx = self.ctx
         try:
             counts = ctx.queue.counts()
-            n = sum(counts.get(s, 0) for s in (CodeStatus.PENDING, CodeStatus.COOLDOWN, CodeStatus.REVIEW))
-            self.set_badge("codes", str(n) if n else "")
+            todo = [(s, int(counts.get(s, 0) or 0))
+                    for s in (CodeStatus.PENDING, CodeStatus.COOLDOWN, CodeStatus.REVIEW)]
+            n = sum(c for _s, c in todo)
+            tip = ""
+            if n:
+                detail = tr("、", ", ").join(f"{s.label()} {c}" for s, c in todo if c)
+                tip = tr("待處理的序號 {count}：{detail}", "{count} to do: {detail}").format(
+                    count=format_count(n), detail=detail)
+            self.set_badge("codes", str(n) if n else "", tip)
         except Exception:  # noqa: BLE001
             log.debug("codes badge unavailable", exc_info=True)
         try:
             n = len(ctx.profiles.list())
-            self.set_badge("profiles", str(n) if n else "")
+            self.set_badge("profiles", str(n) if n else "",
+                           tr("共 {count}", "{count}").format(count=format_count(n, "個設定檔", "profile")) if n else "")
         except Exception:  # noqa: BLE001
             log.debug("profiles badge unavailable", exc_info=True)
         try:
             n = len(ctx.history.records())
-            self.set_badge("history", (str(n) if n < 10000 else "9999+") if n else "")
+            self.set_badge("history", (str(n) if n < 10000 else "9999+") if n else "",
+                           tr("共 {count}", "{count}").format(count=format_count(n, "筆紀錄", "history record"))
+                           if n else "")
         except Exception:  # noqa: BLE001
             log.debug("history badge unavailable", exc_info=True)
 
@@ -358,14 +373,16 @@ class MainWindow(QMainWindow):
         self._refresh_target()
 
     def _refresh_target(self) -> None:
+        """The target item states first whether the window was found, then names it: the item
+        elides on the right, so a long window title never hides the state (UI review U7)."""
         if self._run_mode or not self.isVisible() and self._current:
             return
         p = self._profile
         if p is None:
-            self.set_status("target", tr("目標視窗：未選擇設定檔", "Target: no profile"), "neutral")
+            self.set_status("target", tr("目標視窗：未選擇設定檔", "Target: no profile"), "neutral", "")
             return
         if p.target.is_empty():
-            self.set_status("target", tr("目標視窗：尚未設定", "Target: not set"), "warning")
+            self.set_status("target", tr("目標視窗：尚未設定", "Target: not set"), "warning", "")
             return
         try:
             from ..win32 import windows
@@ -373,15 +390,17 @@ class MainWindow(QMainWindow):
             info = windows.find_window(p.target)
         except Exception:  # noqa: BLE001 - G3 stub or Win32 error: unknown, not an error
             log.debug("find_window failed", exc_info=True)
-            self.set_status("target", tr(f"目標視窗：{p.target.describe()}", f"Target: {p.target.describe()}"),
-                            "neutral")
+            self.set_status("target", tr("目標視窗：{target}", "Target: {target}").format(target=p.target.describe()),
+                            "neutral", "")
             return
         if info is None:
             self.set_status("target", tr("找不到目標視窗", "Target window not found"), "warning",
-                            tr(f"找不到目標視窗：{p.target.describe()}", f"Target window not found: {p.target.describe()}"))
+                            tr("找不到目標視窗：{target}", "Target window not found: {target}").format(
+                                target=p.target.describe()))
         else:
             title = info.title or info.exe_name
-            self.set_status("target", tr(f"目標視窗：{title}（已找到）", f"Target: {title} (found)"), "success", title)
+            self.set_status("target", tr("已找到目標視窗：{title}", "Target found: {title}").format(title=title),
+                            "success", title)
 
     # -- theme ------------------------------------------------------------------------------
     def _on_theme_toggled(self, dark: bool) -> None:

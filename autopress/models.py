@@ -254,7 +254,7 @@ class StepType(enum.StrEnum):
 _STEP_INFO: dict[StepType, tuple[str, str, str]] = {
     StepType.FOCUS_WINDOW: ("切換到視窗", "Focus window", "target"),
     StepType.CLICK_POINT: ("點擊位置", "Click position", "pointer"),
-    StepType.CLICK_TEXT: ("點擊文字（OCR）", "Click text (OCR)", "text_search"),
+    StepType.CLICK_TEXT: ("點擊文字", "Click text", "text_search"),  # finds the text by OCR (step editor hint)
     StepType.TYPE_CODE: ("輸入序號", "Type code", "keyboard"),
     StepType.TYPE_TEXT: ("輸入文字", "Type text", "type"),
     StepType.KEY: ("按鍵／組合鍵", "Key / shortcut", "keycap"),
@@ -1186,7 +1186,7 @@ class Step:
         if isinstance(p, ClickPointParams):
             return p.point.describe() if p.point else tr("尚未設定位置", "Position not set")
         if isinstance(p, ClickTextParams):
-            return f"「{p.text}」" if p.text else tr("尚未設定文字", "Text not set")
+            return quoted_choices(p.text, p.match) if p.text else tr("尚未設定文字", "Text not set")
         if isinstance(p, TypeCodeParams):
             s = p.mode.label()
             if p.split is not SplitMode.NONE:
@@ -1201,7 +1201,8 @@ class Step:
             return s + (f" ±{p.jitter_pct}%" if p.jitter_pct else "")
         if isinstance(p, WaitTextParams):
             verb = tr("出現", "appears") if p.appear else tr("消失", "disappears")
-            return tr(f"等「{p.text}」{verb}", f"until '{p.text}' {verb}")
+            what = quoted_choices(p.text, p.match)
+            return tr(f"等{what}{verb}", f"until {what} {verb}")
         if isinstance(p, OcrCheckParams):
             return tr("範圍已設定", "Region set") if p.region else tr("尚未設定結果範圍", "Result region not set")
         return ""
@@ -1282,6 +1283,21 @@ def text_is_risky(text: str) -> bool:
     """A type_text text with a line break or tab (acts as Enter / moves on) or a script URL
     (javascript:, vbscript:, data:) - highlighted in the import summary (gate G-02)."""
     return any(c in text for c in "\r\n\t") or _SCRIPT_URL.search(text) is not None
+
+
+def quoted_choices(text: str, match: TextMatch = TextMatch.EXACT) -> str:
+    """A click_text / wait_text pattern in words, each alternative verbatim (exactly what the
+    runner looks for, textutil.split_alternatives): "兌換|Redeem" -> 「兌換」或「Redeem」 (zh-TW) /
+    'Redeem' or 'OK' (English); three or more: 「a」、「b」或「c」 / 'a', 'b' or 'c'. A regular
+    expression has its own "|" and is shown as one quoted pattern."""
+    parts = [text] if match is TextMatch.REGEX else split_alternatives(text)
+    if not parts:
+        parts = [text]
+    zh = [f"「{p}」" for p in parts]
+    en = [f"'{p}'" for p in parts]
+    if len(parts) == 1:
+        return tr(zh[0], en[0])
+    return tr("、".join(zh[:-1]) + "或" + zh[-1], ", ".join(en[:-1]) + " or " + en[-1])
 
 
 def make_step(step_type: StepType, delays: DelaySettings | None = None) -> Step:
@@ -1586,8 +1602,10 @@ class Profile:
         ``(text, risky)``. Literal key combos and texts are shown verbatim (author labels are NOT
         used, so a label cannot disguise a step); ``risky`` marks combo_risk warnings and errors,
         and type_text without {code} or with a line break, tab or script URL (shown as ↵ / ⇥).
-        click_text steps skipped when nothing is found say so in the text (not risky: every
-        template closes its result popup that way). Non-default run rules: ``policy_lines()``."""
+        click_text alternatives are listed one by one, each verbatim (``quoted_choices``: 「確定」或
+        「OK」; a regex stays one pattern); steps skipped when nothing is found say so in the text
+        (not risky: every template closes its result popup that way). Non-default run rules:
+        ``policy_lines()``."""
         out: list[tuple[str, bool]] = []
         for n, (_i, s) in enumerate(self.enabled_steps(), 1):
             p = s.params
@@ -1595,7 +1613,7 @@ class Profile:
             if isinstance(p, ClickPointParams):
                 detail = p.point.describe() if p.point else tr("（位置未設定）", "(position not set)")
             elif isinstance(p, ClickTextParams):
-                detail = f"「{p.text}」"
+                detail = quoted_choices(p.text, p.match)
                 if p.on_not_found is TimeoutAction.CONTINUE:
                     detail += tr("（找不到就略過）", " (skipped when not found)")
             elif isinstance(p, TypeCodeParams):
@@ -1603,6 +1621,8 @@ class Profile:
             elif isinstance(p, TypeTextParams):
                 shown = p.text.replace("\r\n", "\n").replace("\r", "\n").replace("\n", "↵").replace("\t", "⇥")
                 detail = f"「{shown}」"
+                if "{code}" in p.text:  # the text stays literal; say what the placeholder becomes
+                    detail += tr("（{code} 會換成每一筆序號）", " ({code} becomes each code)")
                 risky = "{code}" not in p.text or text_is_risky(p.text)
             elif isinstance(p, KeyParams):
                 level, reason = combo_risk(p.keys)
@@ -2126,7 +2146,7 @@ class PreviewMark:
     step_id: str = ""
     kind: PreviewKind = PreviewKind.POINT
     rect: Rect = (0, 0, 1, 1)  # physical; points are 1x1
-    label: str = ""  # e.g. "2 點擊位置"
+    label: str = ""  # e.g. "點擊位置" (the step title; the overlay's badge shows step_index + 1)
     ok: bool = True  # inside the client area and on the target window
 
 

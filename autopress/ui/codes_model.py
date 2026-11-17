@@ -1,13 +1,14 @@
 # OWNED BY G6
 """Qt model, filter proxy and delegates for the code queue table (SPEC 6.4.1).
 
-Columns (COLUMNS): check, #, 序號 (mono; ``flagged`` characters highlighted with warning_soft
-and underlined, ``lookalikes`` with a dotted underline only), 來源 (icon + label), 辨識信心
-(bar only for OCR sources), 狀態 (status chip via widgets.paint_status_chip), 訊息 (elided),
-⋯ (row menu). Rows 42 px, no grid. The model observes CodeQueue.subscribe and maps QueueEvents
-to fine-grained model signals: after every event it diffs the queue's id list against its own
-(missing ids -> rowsRemoved, a new order -> layoutChanged with the persistent indexes moved, new
-ids -> rowsInserted, then dataChanged), so it stays correct whatever ids an event names.
+Columns (COLUMNS): check (titled 執行, header tooltip ``check_column_tip``), #, 序號 (mono;
+``flagged`` characters highlighted with warning_soft and underlined, ``lookalikes`` with a dotted
+underline only), 來源 (icon + label), 辨識信心 (bar only for OCR sources), 狀態 (status chip via
+widgets.paint_status_chip), 訊息 (elided), ⋯ (row menu). Rows 42 px, no grid. The model observes
+CodeQueue.subscribe and maps QueueEvents to fine-grained model signals: after every event it
+diffs the queue's id list against its own (missing ids -> rowsRemoved, a new order ->
+layoutChanged with the persistent indexes moved, new ids -> rowsInserted, then dataChanged), so
+it stays correct whatever ids an event names.
 
 Painting helpers shared with the import dialogs and the History page: ``paint_code``,
 ``paint_badge``, ``paint_confidence``, ``paint_check`` and ``CellDelegate`` (draws the QSS item
@@ -37,7 +38,7 @@ from PyQt6.QtGui import QIcon, QPainter
 from PyQt6.QtWidgets import QApplication, QLineEdit, QStyle, QStyledItemDelegate, QStyleOptionViewItem, QToolTip, QWidget
 
 from ..i18n import T, tr
-from ..models import CodeItem, CodeStatus, QueueEvent, QueueEventKind, code_key
+from ..models import CodeItem, CodeStatus, QueueEvent, QueueEventKind, RunSelection, code_key
 from ..textutil import clean_text
 from . import icons, theme, widgets
 from .codes_common import subscribe_weak
@@ -73,11 +74,25 @@ FILTER_LABELS: dict[str, T] = {
     "all": T("全部", "All"), "pending": T("待兌換", "Pending"), "review": T("需確認", "Review"),
     "done": T("已完成", "Done"), "failed": T("失敗", "Failed"), "skipped": T("已略過", "Skipped"),
 }
-COLUMN_TITLES: tuple[T, ...] = (T("", ""), T("#", "#"), T("序號", "Code"), T("來源", "Source"),
+COLUMN_TITLES: tuple[T, ...] = (T("執行", "Run"), T("#", "#"), T("序號", "Code"), T("來源", "Source"),
                                 T("辨識信心", "Confidence"), T("狀態", "Status"), T("訊息", "Message"), T("", ""))
-COLUMN_WIDTHS: tuple[int, ...] = (40, 44, 220, 112, 116, 0, -1, 44)
+"""The check column is titled 執行 / Run: its ticks say which codes 「只跑勾選的」 redeems, so they
+are never mistaken for the row selection that the bulk actions use."""
+COLUMN_WIDTHS: tuple[int, ...] = (56, 44, 220, 112, 116, 0, -1, 44)
 """Fixed widths; 0 = computed from the widest status chip, -1 = stretch. The page fits the code
-column to the longest code (``code_column_width``)."""
+column to the longest code (``code_column_width``). 56 = the bold 12 px header title plus the
+12 px section padding on each side."""
+
+
+def check_column_tip() -> str:
+    """Tooltip of the 執行 column header: what a tick does in each run setting (the setting's
+    names come from RunSelection, as on the Run page) and that bulk actions use the selection."""
+    return tr("勾選＝在「執行」頁選「{checked}」時要兌換的序號（選「{all}」時勾選不影響）。\n"
+              "批次動作只作用在點選反白的序號。",
+              "Checked = redeemed when the Run page is set to {checked} (no effect with {all}).\n"
+              "Bulk actions work on the highlighted codes.").format(
+        checked=RunSelection.CHECKED.label(), all=RunSelection.UNFINISHED.label())
+
 
 MUTED_STATUSES = frozenset({CodeStatus.USED, CodeStatus.INVALID, CodeStatus.EXPIRED, CodeStatus.SKIPPED})
 
@@ -165,6 +180,8 @@ class CodesTableModel(QAbstractTableModel):
             return str(COLUMN_TITLES[section])
         if role == Qt.ItemDataRole.TextAlignmentRole:
             return int(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+        if role == Qt.ItemDataRole.ToolTipRole and section == COL_CHECK:
+            return check_column_tip()
         return None
 
     def flags(self, index: QModelIndex) -> Qt.ItemFlag:
@@ -246,7 +263,7 @@ class CodesTableModel(QAbstractTableModel):
         if col == COL_MESSAGE:
             return item.message or None
         if col == COL_CHECK:
-            return tr("勾選＝執行「只跑勾選的」時會兌換這筆", "Checked = included when running checked codes only")
+            return check_column_tip()
         if col == COL_MORE:
             return tr("更多動作", "More actions")
         return None

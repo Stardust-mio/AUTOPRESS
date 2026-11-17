@@ -134,8 +134,10 @@ class SettingsPage(QWidget):
         s.add_row(tr("外觀", "Appearance"), self.theme_seg, tr("立即套用。", "Applied at once."))
         self.welcome_button = push_button(tr("再顯示一次", "Show again"), "secondary", "sparkle")
         self.welcome_button.clicked.connect(self._reset_welcome)
-        s.add_row(tr("歡迎畫面", "Welcome screen"), self.welcome_button,
-                  tr("下次啟動時再顯示歡迎畫面與三條使用原則。", "Show the welcome screen and the three rules at the next start."))
+        # no rule count in the hint, so it cannot drift from the welcome dialog's list
+        _row, self.welcome_hint = s.add_row(
+            tr("歡迎畫面", "Welcome screen"), self.welcome_button,
+            tr("下次啟動時再顯示歡迎畫面與使用原則。", "Show the welcome screen and its rules again at the next start."))
         return s
 
     def _build_safety(self) -> QWidget:
@@ -153,7 +155,8 @@ class SettingsPage(QWidget):
         self.countdown = spin_box(0, 10, tr(" 秒", " s"), tr("不倒數", "None"))
         self.countdown.valueChanged.connect(self._bind(lambda v: setattr(self.ctx.settings, "countdown_s", int(v))))
         s.add_row(tr("開始前倒數", "Countdown before a run"), self.countdown,
-                  tr("開始兌換與真的測試步驟前，先倒數讓你放開滑鼠。", "Before runs and real step tests, so you can let go of the mouse."))
+                  tr("開始兌換、測試一筆，或以「真的執行」測試步驟前，先倒數讓你放開滑鼠。",
+                     "Before a run, Test one or a step test with 'Run for real', so you can let go of the mouse."))
         self.resume_countdown = spin_box(0, 10, tr(" 秒", " s"), tr("不倒數", "None"))
         self.resume_countdown.valueChanged.connect(
             self._bind(lambda v: setattr(self.ctx.settings, "resume_countdown_s", int(v))))
@@ -191,8 +194,9 @@ class SettingsPage(QWidget):
             hk_lay.addLayout(line)
             edit.comboChanged.connect(lambda combo, a=action: self.set_hotkey(a, combo))
             edit.rejected.connect(lambda reason: self._hotkey_note(reason, "error"))
-        self.hotkey_hint = label(tr("只在執行與真的測試步驟時註冊，平常不會佔用這些按鍵。點一下欄位，再按下新的組合鍵。",
-                                    "Registered only during runs and real step tests. Click a field, then press the new keys."),
+        self.hotkey_hint = label(tr("只在執行期間與「真的執行」的步驟測試時註冊，平常不會佔用這些按鍵。點一下欄位，再按下新的組合鍵。",
+                                    "Registered only during runs and step tests with 'Run for real'. Click a field, then "
+                                    "press the new keys."),
                                  "muted")
         self.hotkey_hint.setWordWrap(True)
         hk_lay.addWidget(self.hotkey_hint)

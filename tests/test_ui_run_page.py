@@ -84,13 +84,15 @@ def test_page_reacts_to_every_session_signal(page: RunPage, qtbot: Any) -> None:
     assert shown(page.running, page) and page.running.state.text() == "執行中"
     assert not page.start_btn.isEnabled()
     s.progress.emit(2, 5, 30.0)
-    assert page.running.position.text() == "第 3 / 5 筆" and "30 秒" in page.running.eta.text()
+    # heading = the ring's count; the position belongs to the code being processed (code_started)
+    assert page.running.position.text() == "已處理 2 / 5 筆" and "30 秒" in page.running.eta.text()
     s.code_started.emit(item.id, 2)
-    assert page.running.code.text() == item.code
+    assert page.running.code.text() == item.code and page.running.index.text() == "第 3 / 5 筆"
     s.step_started.emit(item.id, 1, "點一下序號輸入框")
     assert page.running.step.text() == "第 2 步：點一下序號輸入框"
     s.code_finished.emit(item.id, AttemptRecord(code_id=item.id, status=CodeStatus.SUCCESS))
     assert page.running.counts.counts == {CodeStatus.SUCCESS: 1}
+    assert page.running.step.text() == "結果：成功"
     s.log.emit(LogEntry(level=LogLevel.WARNING, message="沒有出現「確定」，略過這一步"))
     assert page.log_view.lines()[-1].endswith("!  沒有出現「確定」，略過這一步")
     s.cooldown.emit(12.0)

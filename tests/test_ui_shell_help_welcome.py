@@ -7,8 +7,9 @@ import gc
 from typing import Any
 
 import pytest
+from PyQt6 import sip
 from PyQt6.QtCore import QEvent, Qt
-from PyQt6.QtWidgets import QApplication, QLabel
+from PyQt6.QtWidgets import QApplication, QLabel, QWidget
 
 from autopress import i18n, storage
 from autopress.models import Language, ThemeName
@@ -29,40 +30,57 @@ def _free_widgets(qapp: QApplication):
 
 
 def _all_text(w: Any) -> str:
-    return "\n".join(lb.text() for lb in w.findChildren(QLabel))
+    # without the invisible word joiners that keep a quoted term on one line (widgets.keep_quoted)
+    return "\n".join(lb.text() for lb in w.findChildren(QLabel)).replace("⁠", "")
 
 
-def test_help_sections_zh(demo_ctx: Any, qtbot: Any) -> None:
+def _destroy(w: QWidget) -> None:
+    """Delete a Help page through Qt's event loop while its Python wrapper is still alive (repair round 1,
+    as tests/test_ui_polish_other.py does): leaving it to Python's garbage collection has crashed a later
+    FailsafeMap paint in the same test process (access violation, heap-layout dependent)."""
+    w.hide()
+    w.deleteLater()
+    QApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete.value)
+    assert sip.isdeleted(w)
+
+
+def test_help_sections_zh(demo_ctx: Any) -> None:
     page = HelpPage(demo_ctx)
-    qtbot.addWidget(page)
-    assert list(page.sections) == ["about", "safety", "troubleshooting", "hotkeys", "privacy"]
-    text = _all_text(page)
-    for phrase in ("只輸入你自己的序號", "只匯入你信任的人分享的設定檔", "/redeem", "不是法律建議",
-                   "系統管理員", "拖曳", "無邊框視窗", "縮放比例", "注音", "模擬鍵入", "找不到按鈕上的文字",
-                   "其他資訊", "仍要執行", "防毒軟體", "隔離", "鎖住滑鼠游標", "帳號或角色名稱", "離線運作"):
-        assert phrase in text, phrase
-    assert page.pause_key.text() == "F8" and page.stop_key.text() == "F9"
-    page.scroll_to("privacy")
-    page.scroll_to("unknown")
+    try:
+        assert list(page.sections) == ["about", "safety", "troubleshooting", "hotkeys", "privacy"]
+        text = _all_text(page)
+        for phrase in ("只輸入你自己的序號", "只匯入你信任的人分享的設定檔", "/redeem", "不是法律建議",
+                       "系統管理員", "拖曳", "無邊框視窗", "縮放比例", "注音", "模擬鍵入", "找不到按鈕上的文字",
+                       "其他資訊", "仍要執行", "防毒軟體", "隔離", "鎖住滑鼠游標", "帳號或角色名稱", "離線運作"):
+            assert phrase in text, phrase
+        assert page.pause_key.text() == "F8" and page.stop_key.text() == "F9"
+        page.scroll_to("privacy")
+        page.scroll_to("unknown")
+    finally:
+        _destroy(page)
 
 
-def test_help_follows_settings(demo_ctx: Any, qtbot: Any) -> None:
+def test_help_follows_settings(demo_ctx: Any) -> None:
     page = HelpPage(demo_ctx)
-    qtbot.addWidget(page)
-    demo_ctx.settings.hotkeys.stop = "F10"
-    demo_ctx.settings.failsafe_enabled = False
-    demo_ctx.save_settings()
-    assert page.stop_key.text() == "F10" and "關閉" in page.failsafe_text.text()
+    try:
+        demo_ctx.settings.hotkeys.stop = "F10"
+        demo_ctx.settings.failsafe_enabled = False
+        demo_ctx.save_settings()
+        assert page.stop_key.text() == "F10" and "關閉" in page.failsafe_text.text()
+    finally:
+        _destroy(page)
 
 
-def test_help_english(demo_ctx: Any, qtbot: Any) -> None:
+def test_help_english(demo_ctx: Any) -> None:
     i18n.set_language("en")
     page = HelpPage(demo_ctx)
-    qtbot.addWidget(page)
-    text = _all_text(page)
-    for phrase in ("Enter only your own codes", "administrator", "Explorer", "borderless", "SmartScreen",
-                   "Run anyway", "antivirus", "/redeem", "not legal advice", "stop hotkey"):
-        assert phrase in text, phrase
+    try:
+        text = _all_text(page)
+        for phrase in ("Enter only your own codes", "administrator", "Explorer", "borderless", "SmartScreen",
+                       "Run anyway", "antivirus", "/redeem", "not legal advice", "stop hotkey"):
+            assert phrase in text, phrase
+    finally:
+        _destroy(page)
 
 
 def test_failsafe_map_left_of_primary(qtbot: Any) -> None:

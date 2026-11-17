@@ -11,7 +11,8 @@ the active run plan are read-only (SPEC 5.7: 「執行中，請先停止」). St
 review gate of SPEC 5.4 holds); 標記為已兌換 = SUCCESS 「手動標記」 plus a history record with run_id
 "manual" so later imports skip the code; 指定給目前遊戲 = ``queue.assign_game``; 清除已完成 removes
 the codes of the 已完成 filter (SUCCESS, SUBMITTED, USED) in the current game scope; 匯出 CSV
-exports the rows shown.
+exports the rows shown. The check boxes (``CodeItem.checked``) only matter for 「只跑勾選的」: the
+first untick while the run setting is 「全部未完成」 shows a one-time toast saying so.
 """
 
 from __future__ import annotations
@@ -26,7 +27,7 @@ from PyQt6.QtWidgets import QAbstractItemView, QFileDialog, QMenu
 
 from ..codes import csvexport
 from ..i18n import tr
-from ..models import AttemptRecord, CodeItem, CodeStatus, now_iso
+from ..models import AttemptRecord, CodeItem, CodeStatus, RunSelection, now_iso
 from ..storage import StorageError
 from . import widgets
 from .codes_common import MANUAL_MARK, RUN_LOCKED, game_name
@@ -232,12 +233,15 @@ class CodesActionsMixin:
         if ids:
             with self._model.batch():
                 self.ctx.queue.set_checked(ids, checked)
+            self._note_untick(not checked)
 
     def toggle_checked_selected(self) -> None:
         items = [it for it in self.selected_items() if not self._model.is_locked(it.id)]
         if items:
+            checked = not all(it.checked for it in items)
             with self._model.batch():
-                self.ctx.queue.set_checked([it.id for it in items], not all(it.checked for it in items))
+                self.ctx.queue.set_checked([it.id for it in items], checked)
+            self._note_untick(not checked)
 
     def on_check_toggled(self, index: QModelIndex, checked: bool) -> None:
         """Check-box click: applies to every selected row when the clicked row is selected."""
@@ -247,6 +251,19 @@ class CodesActionsMixin:
         if ids:
             with self._model.batch():
                 self.ctx.queue.set_checked(ids, checked)
+            self._note_untick(not checked)
+
+    def _note_untick(self, unticked: bool) -> None:
+        """With the run setting 「全部未完成」 (the default) a tick changes nothing, so the first
+        untick of the page says how to run only the ticked codes (once per page)."""
+        if (not unticked or getattr(self, "_uncheck_note_shown", False)
+                or RunSelection(self.ctx.settings.run_selection) is not RunSelection.UNFINISHED):
+            return
+        self._uncheck_note_shown = True
+        self.ctx.notify(tr("目前會兌換全部未完成的序號，取消勾選不會略過它；只想跑勾選的序號，請在「執行」頁選「{checked}」。",
+                           "All unfinished codes run, so unchecking does not skip a code; to run only the checked "
+                           "codes, choose {checked} on the Run page.").format(checked=RunSelection.CHECKED.label()),
+                        "info")
 
     def copy_selected(self) -> int:
         items = self.selected_items()

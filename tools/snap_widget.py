@@ -6,9 +6,13 @@
 
 ``module:factory`` - a class or function; it receives the demo AppContext when it has a
 required first parameter (pages: ``Page(ctx)``), otherwise it is called without arguments.
-The context comes from tests/fakes.py demo_context() (``--empty``: without demo data).
+The context comes from tests/fakes.py demo_context() (``--empty``: without demo data); its
+theme setting is the rendered theme. Window lookups, the privilege probe and the monitor list
+see the demo desktop of tools/guide_capture.py, never the real one (real window titles can
+hold e-mail addresses or account names).
 While G5's theme/widgets are stubs, tests/ui_fallback.py stand-ins are used (plain look).
 Prints the PNG path and any QLabel whose text is clipped. Writes nothing else.
+For the user-guide pictures (every screen, one coherent demo state) use tools/guide_capture.py.
 """
 
 from __future__ import annotations
@@ -29,17 +33,31 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 
-def clipped_labels(root: object) -> list[str]:
-    from PyQt6.QtGui import QFontMetrics
+def clipped_labels(root: object, include_elided: bool = False) -> list[str]:
+    """Visible single-line QLabels whose text is wider than the label ("clipped: ..."). Labels
+    that elide on purpose (widgets.ElidedLabel, drawn with "…") are left out, or reported as
+    "elided: ..." with ``include_elided``. Rich-text labels are measured without their tags."""
+    from PyQt6.QtCore import Qt
+    from PyQt6.QtGui import QFontMetrics, QTextDocument
     from PyQt6.QtWidgets import QLabel
 
     out = []
     for lb in root.findChildren(QLabel):  # type: ignore[attr-defined]
         if not lb.isVisible() or lb.wordWrap() or not lb.text() or lb.pixmap() is not None and not lb.pixmap().isNull():
             continue
-        need = QFontMetrics(lb.font()).horizontalAdvance(lb.text().split("\n")[0])
+        text = lb.text()
+        if lb.textFormat() == Qt.TextFormat.RichText or (lb.textFormat() == Qt.TextFormat.AutoText
+                                                         and Qt.mightBeRichText(text)):
+            doc = QTextDocument()
+            doc.setHtml(text)
+            text = doc.toPlainText()
+        need = QFontMetrics(lb.font()).horizontalAdvance(text.split("\n")[0])
         if need > lb.contentsRect().width() + 1:
-            out.append(f"clipped: {lb.text()[:40]!r} needs {need}px, has {lb.contentsRect().width()}px")
+            elided = any(c.__name__ == "ElidedLabel" for c in type(lb).__mro__)
+            if elided and not include_elided:
+                continue
+            kind = "elided" if elided else "clipped"
+            out.append(f"{kind}: {text[:40]!r} needs {need}px, has {lb.contentsRect().width()}px")
     return out
 
 
@@ -75,9 +93,13 @@ def main(argv: list[str] | None = None) -> int:
 
     i18n.set_language(a.lang)
     theme.apply_theme(app, a.theme)
+    from autopress.models import ThemeName
     from tests.fakes import demo_context
+    from tools.guide_capture import DemoWorld, install_demo_environment
 
+    install_demo_environment(DemoWorld())  # never the real desktop's windows or monitors
     ctx = demo_context(Path(os.environ["AUTOPRESS_HOME"]), with_data=not a.empty)
+    ctx.settings.theme = ThemeName(a.theme)  # the Appearance controls match the rendered theme
     modname, _, attr = a.target.partition(":")
     factory = getattr(importlib.import_module(modname), attr)
     try:

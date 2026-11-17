@@ -55,7 +55,8 @@ def _point_ok(backend: Backend, profile: Profile, hwnd: int, pid: int, client: R
 def preview_profile(profile: Profile, hwnd: int, *, backend: Backend | None = None) -> list[PreviewMark]:
     """One PreviewMark per recorded geometry of every enabled step, in step order: click_point
     point, click_text search region + fallback point, type_code verify region, wait_text
-    region, ocr_check region. Physical rects via models.resolve_point/resolve_region with
+    region, ocr_check region. ``label`` is the step's display title without its number (the
+    overlay's badge shows step_index + 1). Physical rects via models.resolve_point/resolve_region with
     ``profile.coord_mode`` and the window's DPI. ``ok`` is False when a point is outside the
     client area or covered by another window - AutoPress's own windows do not count
     (win32.windows.window_at(..., skip_own=True)): they are hidden during runs. Regions are ok
@@ -84,7 +85,7 @@ def preview_profile(profile: Profile, hwnd: int, *, backend: Backend | None = No
         for i, step in enumerate(profile.steps):
             if not step.enabled or step.type is StepType.UNKNOWN:
                 continue
-            label = f"{i + 1} {step.display_title()}"
+            label = step.display_title()  # the badge carries the number
             for attr, kind in _GEOMETRY.get(step.type, ()):
                 value = getattr(step.params, attr, None)
                 if isinstance(value, ClientPoint):

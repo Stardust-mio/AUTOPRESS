@@ -19,6 +19,9 @@ from .widgets import ElidedLabel, Keycap, label
 _TONE_TOKEN = {"neutral": "text_muted", "success": "success", "warning": "warning", "error": "error",
                "info": "info", "accent": "accent", "violet": "violet", "orange": "orange"}
 _TEXT_ROLE = {"warning": "warning", "error": "error"}
+TARGET_MAX_W = 480
+"""Widest the target item's text gets (logical px); it elides on the right below that, so the
+state that main_window puts first (「已找到目標視窗：」) stays visible down to the 1100 px window."""
 
 
 class StatusItem(QWidget):
@@ -125,7 +128,7 @@ class StatusBar(QFrame):
         self._lay.addStretch(1)
         self._right_index = self._lay.count()
         self.items["ocr"] = StatusItem("ocr", "scan", parent=self)
-        self.items["target"] = StatusItem("target", "window", elide_width=300, parent=self)
+        self.items["target"] = StatusItem("target", "window", elide_width=TARGET_MAX_W, parent=self)
         self.items["run"] = StatusItem("run", "play", parent=self)
         for key in self.RIGHT:
             self._lay.addWidget(self.items[key], 0, Qt.AlignmentFlag.AlignVCenter)

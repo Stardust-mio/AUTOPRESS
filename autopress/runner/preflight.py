@@ -255,7 +255,7 @@ def run_preflight(profile: Profile, settings: Settings, *, code_count: int, ocr_
                 _issue(issues, IssueLevel.INFO, "ocr_loading", msg.pf_ocr_loading(), "", "wait_ocr")
         cap_reached = daily_cap_left == 0 and settings.daily_cap > 0
         if code_count <= 0 and not (cap_reached and daily_cap_shortened):
-            _issue(issues, IssueLevel.ERROR, "no_codes", msg.pf_no_codes())
+            _issue(issues, IssueLevel.ERROR, "no_codes", msg.pf_no_codes(profile.game or profile.name))
         if unassigned_count > 0:
             _issue(issues, IssueLevel.INFO, "unassigned_codes", msg.pf_unassigned(unassigned_count), "",
                    "assign_codes")
@@ -270,7 +270,9 @@ def run_preflight(profile: Profile, settings: Settings, *, code_count: int, ocr_
                for _i, s in profile.enabled_steps()):
             _issue(issues, IssueLevel.INFO, "no_verify", msg.pf_no_verify(), "", "open_profile")
         if not profile.last_test_ok_at:
-            _issue(issues, IssueLevel.WARNING, "untested_profile", msg.pf_untested(), "", "test_one")
+            # 測試一筆 needs a code: without one the button would contradict the disabled one on the page
+            _issue(issues, IssueLevel.WARNING, "untested_profile", msg.pf_untested(), "",
+                   "test_one" if code_count > 0 else "")
         pol = profile.policy
         if min(pol.interval_min_s, pol.interval_max_s) < 2:
             _issue(issues, IssueLevel.WARNING, "fast_interval", msg.pf_fast_interval(min(pol.interval_min_s,

@@ -9,13 +9,22 @@ Why a proxy style next to the QSS (ux.md section 6, prototype lessons):
   padding is ignored - measured on Qt 6.12), so ``polish()`` sets the text margin of every
   spin box; it also applies the SPEC 6.5 / pyqt-windows.md rules app-wide:
   ``setKeyboardTracking(False)`` and select-all when the field gets the focus.
+* Disabled icons: ``icons.icon`` adds a ``text_disabled`` pixmap for buttons, but Qt generates
+  the disabled look itself wherever a QIcon has no Disabled entry - every disabled QLabel
+  (Qt 6.12 keeps a label pixmap as a one-entry QIcon), and any QIcon built from a bare pixmap.
+  Qt's formula lightens towards the window colour, so on the dark theme a disabled icon came
+  out almost as bright as an enabled one (UI review U26). ``generatedIconPixmap`` therefore
+  recolours single-colour icons to ``text_disabled`` (the disabled text colour); pictures with
+  several colours (program icons in the window picker) keep Qt's version.
 Colours are read at paint time through ``theme.color``, so a theme switch needs no restyle.
 """
 
 from __future__ import annotations
 
+import logging
+
 from PyQt6.QtCore import QEvent, QObject, QPointF, QRectF, Qt, QTimer
-from PyQt6.QtGui import QPainter, QPen
+from PyQt6.QtGui import QColor, QIcon, QImage, QPainter, QPen, QPixmap
 from PyQt6.QtWidgets import (
     QAbstractSpinBox,
     QCheckBox,
@@ -28,10 +37,49 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-__all__ = ["SPIN_TEXT_MARGIN", "AppStyle"]
+__all__ = ["SPIN_TEXT_MARGIN", "AppStyle", "tint_monochrome"]
+
+log = logging.getLogger(__name__)
 
 SPIN_TEXT_MARGIN = 9  # + 1 px border = the 10 px text inset of line edits and combos
 _INDICATOR = 16
+_TINT_MAX_PIXELS = 128 * 128  # icon-sized only (64 px at 200 %); bigger pictures keep Qt's version
+_TINT_MIN_ALPHA = 96  # pixels at least this opaque decide whether an icon has one colour
+_TINT_SPREAD = 12  # largest per-channel difference still "one colour" (anti-aliasing rounding)
+
+
+def tint_monochrome(pixmap: QPixmap, color: QColor) -> QPixmap | None:
+    """``pixmap`` recoloured to ``color`` through its own alpha (same size and device pixel
+    ratio), or None when it is not a single-colour icon: several colours, nothing opaque, or
+    larger than ``_TINT_MAX_PIXELS``."""
+    w, h = pixmap.width(), pixmap.height()
+    if pixmap.isNull() or w * h > _TINT_MAX_PIXELS:
+        return None
+    img = pixmap.toImage().convertToFormat(QImage.Format.Format_ARGB32)
+    ptr = img.constBits()
+    if ptr is None:
+        return None
+    ptr.setsize(img.sizeInBytes())
+    data = bytes(ptr)  # ARGB32 rows are 4 * width bytes; little-endian byte order B, G, R, A
+    alpha = data[3::4]
+    opaque = [i for i, a in enumerate(alpha) if a >= _TINT_MIN_ALPHA]
+    if not opaque:
+        return None
+    for channel in (data[0::4], data[1::4], data[2::4]):
+        values = [channel[i] for i in opaque]
+        if max(values) - min(values) > _TINT_SPREAD:
+            return None
+    img.setDevicePixelRatio(1.0)
+    out = QImage(img.size(), QImage.Format.Format_ARGB32_Premultiplied)
+    out.fill(Qt.GlobalColor.transparent)
+    p = QPainter(out)
+    p.drawImage(0, 0, img)
+    p.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceIn)
+    p.fillRect(out.rect(), QColor(color))
+    p.end()
+    result = QPixmap.fromImage(out)
+    result.setDevicePixelRatio(pixmap.devicePixelRatio())
+    return result
 
 
 class _SelectAllOnFocus(QObject):
@@ -47,7 +95,8 @@ class _SelectAllOnFocus(QObject):
 
 
 class AppStyle(QProxyStyle):
-    """Fusion + themed check / radio indicators + spin-box polish (see module docstring)."""
+    """Fusion + themed check / radio indicators + spin-box polish + disabled icon colour (see the
+    module docstring)."""
 
     def __init__(self) -> None:
         super().__init__(QStyleFactory.create("Fusion"))
@@ -79,6 +128,22 @@ class AppStyle(QProxyStyle):
         if hint == QStyle.StyleHint.SH_DialogButtonBox_ButtonsHaveIcons:
             return 0
         return super().styleHint(hint, option, widget, returnData)
+
+    # -- icons --------------------------------------------------------------------------
+    def generatedIconPixmap(self, iconMode: QIcon.Mode, pixmap: QPixmap,
+                            opt: QStyleOption | None) -> QPixmap:
+        """Disabled single-colour icons in the theme's ``text_disabled`` (module docstring);
+        everything else as Fusion generates it. Qt caches the result per pixmap and palette."""
+        if iconMode == QIcon.Mode.Disabled and pixmap is not None:
+            try:
+                from . import theme
+
+                tinted = tint_monochrome(pixmap, theme.color("text_disabled"))
+                if tinted is not None:
+                    return tinted
+            except Exception:  # noqa: BLE001 - a paint-time helper must never take the app down
+                log.debug("tinting a disabled icon failed", exc_info=True)
+        return super().generatedIconPixmap(iconMode, pixmap, opt)
 
     # -- primitives ---------------------------------------------------------------------
     def drawPrimitive(self, element: QStyle.PrimitiveElement, option: QStyleOption | None,

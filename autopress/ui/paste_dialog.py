@@ -2,7 +2,10 @@
 """Paste / file import dialog: text area (pre-filled), code-format combo (auto-detected with
 codes.presets.detect_format, user can override), live candidate list (checkbox, code, badges
 重複 / 已兌換過 / 不像序號 / 已修正字元, raw text next to the code when normalisation changed it),
-summary 「將加入 {a} 筆，略過 {d} 筆重複、{h} 筆已兌換過」, 加入 / 取消. The live extraction is
+summary 「將加入 {a} 筆，略過 {d} 筆重複、{h} 筆已兌換過」 (parts with a count of 0 left out), 加入 / 取消.
+Word-like tokens (codes.extract ``likely`` False, e.g. "Redemption" in "Redemption code: …") are
+listed unticked with the 不像序號 badge on purpose, so a code that is a word can still be ticked.
+The live extraction is
 debounced (300 ms after the last edit, T35); the initial text is extracted at once. Without an
 active profile the codes are added unassigned (game "")."""
 

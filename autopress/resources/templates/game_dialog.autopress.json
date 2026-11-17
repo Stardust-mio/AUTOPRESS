@@ -3,7 +3,7 @@
   "id": "template-game-dialog",
   "name": "遊戲內兌換視窗（通用）",
   "game": "",
-  "description": "適用遊戲裡的「兌換碼」視窗：先在遊戲裡打開兌換視窗再開始。以遊戲模式（按鍵碼）輸入；建議在「輸入序號」步驟設定核對範圍，確認遊戲收到的字正確。建立後在「遊戲」欄填上遊戲名稱。",
+  "description": "適用遊戲裡的兌換序號視窗：先在遊戲裡打開兌換視窗再開始。以遊戲模式（按鍵碼）輸入；建議在「輸入序號」步驟設定核對範圍，確認遊戲收到的字正確。建立後在「遊戲」欄填上遊戲名稱。",
   "author": "AutoPress",
   "target": {
     "exe": "",
@@ -37,8 +37,8 @@
         "on_timeout": "fail"
       },
       "enabled": true,
-      "label": "確認遊戲的兌換視窗已開啟",
-      "label_en": "Check that the game's redeem dialog is open",
+      "label": "確認兌換視窗已開啟",
+      "label_en": "Check the dialog",
       "id": "tpl-game-1"
     },
     {
@@ -51,7 +51,7 @@
       },
       "enabled": true,
       "label": "點一下序號輸入框",
-      "label_en": "Click the code input box",
+      "label_en": "Click the code box",
       "id": "tpl-game-2"
     },
     {
@@ -66,8 +66,8 @@
         "after_ms": 150
       },
       "enabled": true,
-      "label": "輸入序號（遊戲模式）",
-      "label_en": "Type the code (game mode)",
+      "label": "輸入序號",
+      "label_en": "Type the code",
       "id": "tpl-game-3"
     },
     {
@@ -82,8 +82,8 @@
         "after_ms": 150
       },
       "enabled": true,
-      "label": "按下「確認」或「兌換」按鈕",
-      "label_en": "Press the Confirm or Redeem button",
+      "label": "按下「確認」按鈕",
+      "label_en": "Press Confirm",
       "id": "tpl-game-4"
     },
     {
@@ -97,8 +97,8 @@
         "only_new_text": true
       },
       "enabled": true,
-      "label": "拉出結果訊息出現的範圍",
-      "label_en": "Drag over the area where the result message appears",
+      "label": "框出結果訊息的範圍",
+      "label_en": "Drag over the result",
       "id": "tpl-game-5"
     },
     {
@@ -113,8 +113,8 @@
         "after_ms": 300
       },
       "enabled": true,
-      "label": "關閉結果視窗（沒有就略過）",
-      "label_en": "Close the result popup (skipped if there is none)",
+      "label": "關閉結果（若有）",
+      "label_en": "Close result (if any)",
       "id": "tpl-game-6"
     }
   ],
@@ -122,7 +122,7 @@
     "key": "game_dialog",
     "title_zh": "遊戲內兌換視窗（通用）",
     "title_en": "In-game redeem dialog (generic)",
-    "description_zh": "適用遊戲裡的「兌換碼」視窗：先在遊戲裡打開兌換視窗再開始。以遊戲模式（按鍵碼）輸入；建議在「輸入序號」步驟設定核對範圍，確認遊戲收到的字正確。建立後在「遊戲」欄填上遊戲名稱。",
+    "description_zh": "適用遊戲裡的兌換序號視窗：先在遊戲裡打開兌換視窗再開始。以遊戲模式（按鍵碼）輸入；建議在「輸入序號」步驟設定核對範圍，確認遊戲收到的字正確。建立後在「遊戲」欄填上遊戲名稱。",
     "description_en": "For a redeem-code dialog inside a game: open the dialog in the game before you start. Types in game mode (key codes); setting a verify region on the \"Type code\" step is recommended to check what the game received. After creating it, enter the game name.",
     "order": 30
   },

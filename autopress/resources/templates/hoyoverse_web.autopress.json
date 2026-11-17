@@ -3,7 +3,7 @@
   "id": "template-hoyoverse-web",
   "name": "HoYoverse 網頁兌換",
   "game": "",
-  "description": "原神、崩壞：星穹鐵道、絕區零的官方兌換網頁。開始前先在網頁上登入，並選好伺服器與角色；建立後在「遊戲」欄填上是哪一款遊戲。序號為 6–16 個英數字，大小寫照原樣輸入。",
+  "description": "原神、崩壞：星穹鐵道、絕區零的官方兌換網頁。開始前先在網頁上登入，並選好伺服器與角色；建立後在「遊戲」欄填上是哪一款遊戲。序號為 6–16 個英數字，保留大小寫。",
   "author": "AutoPress",
   "target": {
     "exe": "",
@@ -37,8 +37,8 @@
         "on_timeout": "fail"
       },
       "enabled": true,
-      "label": "確認兌換頁面已開啟（已登入並選好伺服器與角色）",
-      "label_en": "Check that the redeem page is open (logged in, server and character chosen)",
+      "label": "確認兌換頁面已開啟",
+      "label_en": "Check redeem page",
       "id": "tpl-hoyo-1"
     },
     {
@@ -50,8 +50,8 @@
         "after_ms": 150
       },
       "enabled": true,
-      "label": "點一下「兌換碼」輸入框",
-      "label_en": "Click the redemption code box",
+      "label": "點一下「兌換碼」欄",
+      "label_en": "Click the code box",
       "id": "tpl-hoyo-2"
     },
     {
@@ -83,7 +83,7 @@
       },
       "enabled": true,
       "label": "按下「兌換」按鈕",
-      "label_en": "Press the Redeem button",
+      "label_en": "Press Redeem",
       "id": "tpl-hoyo-4"
     },
     {
@@ -97,8 +97,8 @@
         "only_new_text": true
       },
       "enabled": true,
-      "label": "拉出結果訊息出現的範圍",
-      "label_en": "Drag over the area where the result message appears",
+      "label": "框出結果訊息的範圍",
+      "label_en": "Drag over the result",
       "id": "tpl-hoyo-5"
     },
     {
@@ -113,8 +113,8 @@
         "after_ms": 300
       },
       "enabled": true,
-      "label": "關閉結果視窗（沒有就略過）",
-      "label_en": "Close the result popup (skipped if there is none)",
+      "label": "關閉結果（若有）",
+      "label_en": "Close result (if any)",
       "id": "tpl-hoyo-6"
     }
   ],
@@ -231,8 +231,8 @@
     "key": "hoyoverse_web",
     "title_zh": "HoYoverse 網頁兌換",
     "title_en": "HoYoverse web redeem",
-    "description_zh": "原神、崩壞：星穹鐵道、絕區零的官方兌換網頁。開始前先在網頁上登入，並選好伺服器與角色；建立後在「遊戲」欄填上是哪一款遊戲。序號為 6–16 個英數字，大小寫照原樣輸入。",
-    "description_en": "Official redeem pages of Genshin Impact, Honkai: Star Rail and Zenless Zone Zero. Log in on the page and choose the server and character before you start; after creating it, enter which game it is in the game field. Codes are 6-16 letters and digits, typed with their case as written.",
+    "description_zh": "原神、崩壞：星穹鐵道、絕區零的官方兌換網頁。開始前先在網頁上登入，並選好伺服器與角色；建立後在「遊戲」欄填上是哪一款遊戲。序號為 6–16 個英數字，保留大小寫。",
+    "description_en": "Official redeem pages of Genshin Impact, Honkai: Star Rail and Zenless Zone Zero. Log in on the page and choose the server and character before you start; after creating it, enter which game it is in the game field. Codes are 6–16 letters and digits; their case is kept.",
     "order": 20
   },
   "created_at": "2026-11-17T00:00:00+08:00",

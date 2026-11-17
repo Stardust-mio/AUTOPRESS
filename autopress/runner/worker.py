@@ -401,9 +401,11 @@ class Runner(QObject, WaitsMixin):
                             step_index=result_step, ocr_text=result_out.ocr_text, evidence_path=evidence)
             if pol.on_unknown is UnknownAction.PAUSE:
                 self._shared.take_resolved(code_id)  # forget a stale choice
-                self._hard_pause(att.kind, att.message, code_id=code_id, step_index=result_step,
-                                 ocr_text=att.ocr_text, evidence_path=evidence)
-                counted = self._shared.take_resolved(code_id) or status
+                try:
+                    self._hard_pause(att.kind, att.message, code_id=code_id, step_index=result_step,
+                                     ocr_text=att.ocr_text, evidence_path=evidence)
+                finally:  # also when the user marks the result and then presses Stop (StopRequested)
+                    counted = self._count_choice(code_id, status)
             elif pol.on_unknown is UnknownAction.STOP:
                 self._stop(StopReason.ERROR, msg.unknown_stop(shown), attention=att)
 
@@ -428,6 +430,20 @@ class Runner(QObject, WaitsMixin):
         self._counts[status] = self._counts.get(status, 0) + 1
         self._done += 1
         self._emit_progress()
+
+    def _count_choice(self, code_id: str, status: CodeStatus) -> CodeStatus:
+        """After the unknown-result decision: the status the user chose (resolve_attention), or
+        ``status`` without a choice. One count moves to the choice, so the summary counts what the
+        history and the live chips show - whether the run is then resumed or stopped."""
+        counted = self._shared.take_resolved(code_id) or status
+        if counted is not status:
+            left = self._counts.get(status, 0) - 1
+            if left > 0:
+                self._counts[status] = left
+            else:
+                self._counts.pop(status, None)
+            self._counts[counted] = self._counts.get(counted, 0) + 1
+        return counted
 
     # =========================================================================== target checks
     def _ensure_target(self) -> None:

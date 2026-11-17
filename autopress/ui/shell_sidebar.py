@@ -2,8 +2,9 @@
 """Private part of ui.main_window: the 220 px sidebar (SPEC 6.3, mock-up codes_dark.png).
 
 Logo + "AutoPress" / 「序號自動輸入」, caption 「工作區」, nav 序號 / 設定檔 / 執行 / 紀錄 with count
-pills, bottom 設定 / 說明, a divider, the 深色模式 switch and the version line. The active
-item has the nav_active fill and a 3 px accent bar (custom painted, colours read at paint time).
+pills (each pill's tooltip says what it counts), bottom 設定 / 說明, a divider, the 深色模式 switch
+and the version line. The active item has the nav_active fill and a 3 px accent bar (custom
+painted, colours read at paint time).
 """
 
 from __future__ import annotations
@@ -49,9 +50,14 @@ class NavButton(QAbstractButton):
     def badge(self) -> str:
         return self._badge
 
-    def setBadge(self, text: str) -> None:
+    def setBadge(self, text: str, tooltip: str = "") -> None:
+        """Count pill text ("" hides it); ``tooltip`` (also the accessible description) says what
+        the number counts - the 序號 pill counts codes still to do, the others are totals."""
         self._badge = str(text or "")
+        tip = str(tooltip or "") if self._badge else ""
         self.setAccessibleName(f"{self.text()} {self._badge}".strip())
+        self.setToolTip(tip)
+        self.setAccessibleDescription(tip)
         self.update()
 
     def sizeHint(self) -> QSize:
@@ -182,10 +188,10 @@ class Sidebar(QFrame):
         if btn is not None and not btn.isChecked():
             btn.setChecked(True)
 
-    def set_badge(self, page_id: str, text: str) -> None:
+    def set_badge(self, page_id: str, text: str, tooltip: str = "") -> None:
         btn = self.buttons.get(page_id)
         if btn is not None:
-            btn.setBadge(text)
+            btn.setBadge(text, tooltip)
 
     def set_dark(self, dark: bool) -> None:
         """Reflect the applied theme without emitting themeToggled."""

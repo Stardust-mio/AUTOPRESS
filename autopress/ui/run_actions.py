@@ -204,26 +204,35 @@ def first_runnable(ctx: AppContext, profile: Profile, selection: Any = None) -> 
     return items[0].id if items else None
 
 
+def restart_as_admin_flow(parent: QWidget | None, ctx: AppContext | None = None) -> bool:
+    """「以系統管理員身分重新啟動」 (the pre-flight action and the window picker's button): confirm,
+    start the elevated instance (win32.elevation.restart_as_admin) and quit, as the pre-flight action
+    did before (no Save / Discard question of its own). True when the restart was started; a
+    cancelled consent prompt is explained. ``ctx`` is accepted for the callers' convenience."""
+    title = tr("以系統管理員身分重新啟動", "Restart as administrator")
+    text = tr("要以系統管理員身分重新啟動 AutoPress 嗎？\n\n以系統管理員身分執行時，無法從檔案總管拖放檔案，請改用「開啟檔案」。",
+              "Restart AutoPress as administrator?\n\nWhile running as administrator, files cannot be dragged "
+              "in from Explorer; use Open file.")
+    if not w.confirm(parent, title, text, tr("重新啟動", "Restart"), tr("取消", "Cancel")):
+        return False
+    from ..win32 import elevation
+
+    if call(elevation.restart_as_admin, default=False):
+        QApplication.quit()
+        return True
+    w.message(parent, title,
+              tr("沒有重新啟動（可能取消了權限提示）。", "AutoPress was not restarted (the prompt may have been cancelled)."),
+              "warning")
+    return False
+
+
 def perform_action(ctx: AppContext, action: str, profile: Profile, parent: QWidget | None = None,
                    flow: Any = None, code_ids: list[str] | None = None) -> bool:
     """Run a preflight action button (models.PREFLIGHT_ACTIONS). True when something changed
     and the preflight should be repeated."""
     parent = parent or dialog_parent(ctx)
     if action == "restart_admin":
-        text = tr("要以系統管理員身分重新啟動 AutoPress 嗎？\n\n以系統管理員身分執行時，無法從檔案總管拖放檔案，請改用「開啟檔案」。",
-                  "Restart AutoPress as administrator?\n\nWhile running as administrator, files cannot be dragged "
-                  "in from Explorer; use Open file.")
-        if not w.confirm(parent, tr("以系統管理員身分重新啟動", "Restart as administrator"), text,
-                         tr("重新啟動", "Restart"), tr("取消", "Cancel")):
-            return False
-        from ..win32 import elevation
-
-        if call(elevation.restart_as_admin, default=False):
-            QApplication.quit()
-        else:
-            w.message(parent, tr("以系統管理員身分重新啟動", "Restart as administrator"),
-                      tr("沒有重新啟動（可能取消了權限提示）。", "AutoPress was not restarted (the prompt may have been cancelled)."),
-                      "warning")
+        restart_as_admin_flow(parent, ctx)
         return False
     if action == "pick_window":
         from .window_picker import pick_target_window
@@ -317,6 +326,7 @@ __all__ = [
     "perform_action",
     "preview_overlay",
     "profiles_page",
+    "restart_as_admin_flow",
     "set_active_flow",
     "show_preview",
     "target_from_window",

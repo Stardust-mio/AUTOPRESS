@@ -11,7 +11,9 @@ Environment, set before anything imports Qt or numpy:
   ``tests/ui_fallback.py`` patches them with plain-Qt stand-ins (no effect once G5 lands).
 
 Markers (pytest.ini): ``realinput`` - skipped unless ``AUTOPRESS_REALINPUT=1``; such tests hold
-a lock file so two agents never inject input at the same time; run them on their own:
+a lock file so two agents never inject input at the same time; afterwards every key still held is
+released and the CapsLock state, clipboard and cursor position they found are put back
+(``_realinput_user_state``). Run them on their own:
 ``AUTOPRESS_REALINPUT=1 .venv/Scripts/python.exe -m pytest -q -m realinput``.
 ``slow`` - deselect with ``-m "not slow"``.
 """
@@ -131,6 +133,22 @@ def _realinput_lock(request: pytest.FixtureRequest) -> Iterator[None]:
             msvcrt.locking(fh.fileno(), msvcrt.LK_UNLCK, 1)
         finally:
             fh.close()
+
+
+@pytest.fixture(autouse=True)
+def _realinput_user_state(request: pytest.FixtureRequest, _realinput_lock: None) -> Iterator[None]:
+    """Tests marked ``realinput``, inside the lock: the QApplication first (per-monitor-v2, so cursor
+    positions are physical pixels), then ``tests.win32_harness.desktop_state_restored()`` around the
+    test - afterwards keys still held are released and CapsLock, the clipboard and the cursor position
+    are put back."""
+    if request.node.get_closest_marker("realinput") is None:
+        yield
+        return
+    request.getfixturevalue("qapp")
+    from tests.win32_harness import desktop_state_restored
+
+    with desktop_state_restored():
+        yield
 
 
 @pytest.fixture

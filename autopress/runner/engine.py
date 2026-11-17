@@ -324,9 +324,12 @@ class RunSession(QObject):
     def resolve_attention(self, code_id: str, status: CodeStatus, message: str = "") -> None:
         """The user classified an unknown result (Run page): update the queue item and, with
         HistoryStore.update, the latest history record of this run for that code (same record
-        id); then the paused run may be resumed."""
+        id); then the paused run may be resumed. During a run, ``code_finished`` is emitted again
+        with the updated record, so the live result counts (Run page, mini bar - one result per
+        code) follow the choice; the runner's counters and the summary use it too (gate G-11)."""
         status = CodeStatus(status)
-        if self.is_active():
+        active = self.is_active()
+        if active:
             self._shared.set_resolved(code_id, status)  # the runner's failure counters use it (gate G-11)
         if self._queue.get(code_id) is not None:
             changes: dict[str, Any] = {"status": status}
@@ -343,7 +346,9 @@ class RunSession(QObject):
                     rec_changes["result"] = _RESULT_FOR_STATUS[status]
                 if message:
                     rec_changes["message"] = message
-                self._history.update(rec.id, **rec_changes)
+                updated = self._history.update(rec.id, **rec_changes)
+                if active:
+                    self.code_finished.emit(code_id, updated)
                 break
 
     def set_masked_rects(self, rects: Sequence[Rect]) -> None:

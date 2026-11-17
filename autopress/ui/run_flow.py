@@ -13,7 +13,9 @@ Attention whose reason ``opens_main_window`` restores the main window on the Run
 is already paused); 展開 on the bar requests a soft pause and restores the main window when
 PAUSED. On finish: unregister hotkeys, hide the mini bar, set_masked_rects([]),
 set_run_mode(False), summary toast, navigate to "run"; a TEST_ONE run whose code reached a
-result (any final status except FAILED / REVIEW) stores ``profile.last_test_ok_at``.
+result (any final status except FAILED / REVIEW, as the runner read it - a result the user
+marked by hand in the decision does not count) stores ``profile.last_test_ok_at``; a normal run
+never does (only 測試一筆 counts as a test).
 Any page may own a RunFlow (Codes page and Run page do); an instance reacts only to the runs it
 started. All its dialogs are parented to the main window or the mini bar."""
 
@@ -56,6 +58,7 @@ from .run_actions import (
     perform_action,
     set_active_flow,
 )
+from .run_widgets import result_text
 
 log = logging.getLogger(__name__)
 
@@ -109,7 +112,8 @@ class RunFlow(QObject):
         self._auto_pause_at = -1e9
         self._expand_pending = False
         self._main_hidden = False
-        self._results: dict[str, CodeStatus] = {}
+        self._results: dict[str, CodeStatus] = {}  # code_id -> its result in this run (after decisions)
+        self._read_results: dict[str, CodeStatus] = {}  # code_id -> the first result the runner read
         self._codes: dict[str, str] = {}
         s = ctx.session
         s.state_changed.connect(self._on_state)
@@ -246,7 +250,8 @@ class RunFlow(QObject):
         if not self._register_hotkeys():
             return False
         self._plan, self._report, self._mode = plan, report, mode
-        self._results, self._codes = {}, {item.code_id: item.code for item in plan.items}
+        self._results, self._read_results = {}, {}
+        self._codes = {item.code_id: item.code for item in plan.items}
         if not self._run_countdown(ctx.settings.countdown_s):
             return False
         self._active = True
@@ -440,12 +445,30 @@ class RunFlow(QObject):
         if not self._active:
             return
         status = getattr(record, "status", None)
-        if isinstance(status, CodeStatus):
+        if not isinstance(status, CodeStatus):
+            return
+        # PENDING (interrupted before submitting) and COOLDOWN (rate-limited) attempts are retried:
+        # they are not results (integration; G4 emits code_finished for every attempt). A code that
+        # already has a result gets code_finished again only from a decision (resolve_attention):
+        # the result the user picked replaces its 需確認 - one result per code, as on the Run page
+        # and in the summary (also 冷卻中 when the result text became a rate-limit keyword)
+        retry = status in (CodeStatus.PENDING, CodeStatus.COOLDOWN) and code_id not in self._results
+        if not retry:
             self._results[code_id] = status
-            # PENDING (interrupted before submitting) and COOLDOWN (rate-limited) attempts are
-            # retried: they are not results (integration; G4 emits code_finished for every attempt)
-            if self.minibar is not None and status not in (CodeStatus.PENDING, CodeStatus.COOLDOWN):
-                self.minibar.add_result(status)
+            # the 測試一筆 check keeps the result the runner READ: a result marked by hand in the
+            # decision proves nothing about the result region or the keywords
+            self._read_results.setdefault(code_id, status)
+        if self.minibar is None:
+            return
+        if retry:
+            self.minibar.set_current(self._code_text(code_id))  # no step runs while it waits
+            return
+        counts: dict[CodeStatus, int] = {}
+        for st in self._results.values():
+            counts[st] = counts.get(st, 0) + 1
+        self.minibar.set_counts(counts)
+        # the code is done: its result instead of the last step (next to 「下一筆 6 秒後」)
+        self.minibar.set_current(self._code_text(code_id), result_text(status))
 
     def _on_waiting(self, seconds: float) -> None:
         if self._active and self.minibar is not None:
@@ -475,8 +498,8 @@ class RunFlow(QObject):
             text, kind = summary_text(summary, counts, failures)
             self.ctx.notify(text, kind)
         if self._mode is PlanMode.TEST_ONE and self._plan is not None:
-            if any(st not in _NOT_A_RESULT for st in self._results.values()):
-                self._store_test_ok(self._plan.profile.id)
+            if any(st not in _NOT_A_RESULT for st in self._read_results.values()):
+                self._store_test_ok(self._plan.profile.id)  # the runner read a result: the test passed
         self.ctx.navigate("run")
         self.ended.emit(summary)
 

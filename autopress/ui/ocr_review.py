@@ -2,12 +2,14 @@
 """OCR review dialog (ux.md flow F2): the image (zoomable) with detected line boxes on the
 left; candidates on the right (checkbox, editable mono code with ``flagged`` characters
 highlighted and ``lookalikes`` dotted-underlined, confidence, crop of the source line next to
-the text, badges, a 「已核對」 tick per flagged candidate and 「全部已核對」); code-format combo
-(re-extract on change), 重新辨識; states: loading (Spinner "辨識中…"), error (engine
-unavailable, with the reason), no codes found. OCR runs through ctx.ocr.request with
-OcrOptions(code_charset=fmt.allowed_chars() + fmt.separator, det_side=ctx.settings.ocr.det_side)
-for every image size (det 1920 lost small text, T13). Candidates ticked 「已核對」 are returned
-with ``flagged`` cleared, so they enter the queue as PENDING (PX-18); so are edited ones.
+the text, badges, a 「確認無誤」 tick per flagged candidate and 「全部確認無誤」 - the verb 確認 of
+需確認 and the Codes page's 確認無誤 action; the hint names the highlight, not a colour, which
+differs per theme); code-format combo (re-extract on change), 重新辨識; states: loading (Spinner
+"辨識中…"), error (engine unavailable, with the reason), no codes found. OCR runs through
+ctx.ocr.request with OcrOptions(code_charset=fmt.allowed_chars() + fmt.separator,
+det_side=ctx.settings.ocr.det_side) for every image size (det 1920 lost small text, T13).
+Candidates ticked 「確認無誤」 are returned with ``flagged`` cleared, so they enter the queue as
+PENDING (PX-18); so are edited ones.
 
 With 自動偵測 the OCR read uses the generic charset and the format is detected from the OCR
 text; changing the format re-extracts from the same OCR result, 重新辨識 reads the image again
@@ -42,7 +44,7 @@ from ..models import CodeCandidate, CodeFormat, CodeSource, OcrLine, OcrOptions,
 from ..ocr import imageio
 from ..textutil import clean_text
 from . import theme, widgets
-from .codes_candidates import OCR_COLUMNS, CandidateEntry, ImportDialogBase
+from .codes_candidates import OCR_COLUMNS, REVIEWED_LABEL, CandidateEntry, ImportDialogBase
 from .codes_common import NO_CODES_FOUND
 from .codes_paint import code_column_width
 
@@ -272,13 +274,17 @@ class OcrReviewDialog(ImportDialogBase):
         lay.setContentsMargins(0, 0, 0, 0)
         lay.setSpacing(theme.SP[2])
         row = QHBoxLayout()
+        label = str(REVIEWED_LABEL)  # the tick's own label (one verb: 確認, as in 需確認)
         self._review_hint = widgets.label(
-            tr("黃色字元的辨識信心偏低：請對照左邊的原圖，正確就勾選「已核對」，不對就雙擊序號修改。",
-               "Yellow characters were read with low confidence: compare them with the image, tick "
-               "Checked when correct, or double-click the code to fix it."), "secondary")
+            tr("標示的字元辨識信心偏低：請對照左邊的原圖，正確就勾選「{label}」，不對就雙擊序號修改。",
+               'Highlighted characters were read with low confidence: compare them with the image and tick '
+               '"{label}" when they are correct, or double-click the code to fix it.').format(label=label),
+            "secondary")
         self._review_hint.setWordWrap(True)
         row.addWidget(self._review_hint, 1)
-        self._all_reviewed_btn = widgets.push_button(tr("全部已核對", "All checked"), "ghost", "check")
+        self._all_reviewed_btn = widgets.push_button(tr("全部確認無誤", "All look right"), "ghost", "check")
+        self._all_reviewed_btn.setToolTip(tr("把所有標示的序號都勾選「{label}」",
+                                             'Tick "{label}" for every highlighted code').format(label=label))
         self._all_reviewed_btn.clicked.connect(self._model.set_all_reviewed)
         row.addWidget(self._all_reviewed_btn)
         lay.addLayout(row)

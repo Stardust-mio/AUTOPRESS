@@ -69,6 +69,8 @@ class KeywordsEditor(QWidget):
         fuzzy_lb = w.label(tr("容許辨識誤差（9 個字元以上的英文關鍵字可差一個字）",
                               "Tolerate OCR errors (one character for English keywords of 9+ characters)"),
                            "secondary")
+        fuzzy_lb.setWordWrap(True)  # wraps in a narrow editor instead of widening the Profiles page
+        self.fuzzy_label = fuzzy_lb
         bottom.addWidget(fuzzy_lb, 1)
         self.reset_btn = w.push_button(tr("還原預設", "Restore defaults"), "ghost", "refresh")
         self.reset_btn.clicked.connect(self.restore_defaults)

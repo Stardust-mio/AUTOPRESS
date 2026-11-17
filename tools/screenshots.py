@@ -23,7 +23,9 @@ Manifest (UTF-8 JSON; relative paths are relative to the manifest file)::
 ``capture`` (used with ``--capture``, or when the source file is missing) renders the source
 with tools/snap_widget.py - the real widget with demo data (tests/fakes.py), windows platform,
 never shown on screen. Screens that need a running app (dialogs, wizard steps, the mini bar)
-are captured separately and referenced by ``source``. Coordinates are pixels of the source PNG
+are captured separately and referenced by ``source``: use the PNGs of tools/guide_capture.py
+(every README / guide screen in one demo state, demo desktop, privacy check; its ``--geometry``
+JSON gives widget rects for the callouts). Coordinates are pixels of the source PNG
 (a 150 % capture has 1.5x the pixels: give ``scale`` 1.5 so badges grow with it).
 
 The callouts copy the design preview's look (docs/design-preview/codes_annotated.png): an

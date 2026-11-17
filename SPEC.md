@@ -123,7 +123,11 @@ lock-protected values (thread-safe); the UI never touches the Runner object. Run
 interrupted before submit; a `code_finished` for an id no longer in the queue is logged and ignored; on `finished`
 any plan item still RUNNING becomes REVIEW (「執行中斷，請確認是否已兌換」 / "The run was interrupted; check whether
 this code was redeemed"); `resolve_attention` changes the queue item and, through `HistoryStore.update`, the
-attempt's history record in place.
+attempt's history record in place; during a run it then emits `code_finished` again with the updated record, so
+the live result chips (Run page, MiniBar: one result per code) follow the choice, and the runner's counters and
+the summary count the chosen status (G-11; integration of the UI polish) - also when the user marks the result
+and then stops instead of resuming. A choice of 冷卻中 (the result text added as a rate-limit keyword) is that
+code's result in this run on every view (the code is not retried in this run; the run's end makes it PENDING).
 
 ### 2.3 Blocking waits
 Every wait in the runner (step delays, key delays inside `win32.input` via the `sleep=` argument, polling loops of
@@ -165,7 +169,10 @@ after it. `wait_while_paused()` blocks on a condition variable and runs no input
    (`resume_countdown_s`, F9 = stop) and then calls `session.resume()`.
 8. `finished` -> unregister hotkeys, hide MiniBar, `set_masked_rects([])`, `set_run_mode(False)`, summary toast,
    navigate to the Run page (summary card). A TEST_ONE run whose code reached a final status other than FAILED /
-   REVIEW sets `profile.last_test_ok_at` and saves the profile.
+   REVIEW sets `profile.last_test_ok_at` and saves the profile; a normal run never does (only 測試一筆 counts as
+   a test). It counts the status the runner read: an unknown result the user marked by hand in the decision
+   (`resolve_attention`) does not count as a passed test. Without runnable codes the `untested_profile` warning
+   has no 測試一筆 action (the page's own 測試一筆 is disabled then).
 
 ### 2.5 Per-code algorithm (Runner, G4)
 ```
@@ -272,6 +279,15 @@ written to the history.
 8. Failsafe = the cursor in an OUTER top-left corner of the desktop (`models.in_failsafe_corner`), shown on the
    countdown and in the MiniBar tooltip; F9 is the stop for games that confine the cursor.
 9. AutoPress's own windows never reach OCR (masked captures) and never silently swallow a click (guard message).
+10. Text after keys: UNICODE typing starts only `win32.input.TEXT_AFTER_KEYS_SETTLE_S` (0.2 s) after our last
+    ordinary key or mouse-button event when the target's thread has a default IME window. While IMM is enabled that
+    is practically every window (69/69 measured); only a process that called ImmDisableIME skips the wait. The wait
+    goes through the interruptible `sleep` (RunControl.sleep in runs: stop requests and the failsafe corner are
+    checked in every slice), and `InjectGuard.check()` still runs before every character, after the wait. Reason
+    (measured 2026-11-17, zh-TW Bopomofo IME, Qt 6): Qt applies an IME commit at once but delivers queued keys only
+    in its next event-loop pass. Without the wait, characters overtook clear_field's Ctrl+A + Backspace 30/30 times,
+    and the clear deleted the first characters of the code. This is a mitigation, not a guarantee: it holds only
+    while the target handles its input within the settle (11.11).
 
 ### 2.8 Startup and shutdown (G5, `autopress/ui/app.py`)
 1. `main.py` / `autopress/__main__.py` set `OPENBLAS_NUM_THREADS=1` before anything imports numpy. `ui.app.main`
@@ -313,6 +329,7 @@ AUTOPRESS/
     resources/templates/*.autopress.json  resources/icon.ico  resources/icon.png                (G8)
   tests/   conftest fakes ui_fallback interface_snapshot.json test_* (A1) + group test files
   tools/   interface_snapshot snap_widget check_ownership (A1) · fake_redeem_app (G4) · make_icon screenshots (G8)
+           · guide_capture (ORCH: README / user-guide screenshots)
   docs/    requirements.md (user) · research/** (read-only) · review/** (critiques, orchestrator) · user_guide.md, images/ (G8)
 ```
 
@@ -349,6 +366,7 @@ Globs use fnmatch ("*" also crosses "/"). A group may add private helper files o
 | `docs/user_guide.md` `docs/images/*` `autopress.spec` `build.ps1` `version_info.txt` | G8 | user guide (zh-TW), doc screenshots, PyInstaller spec, build + zip script, generated version resource |
 | `tools/make_icon.py` `tools/screenshots.py` `tests/test_packaging*.py` `tests/test_templates*.py` `tests/data/packaging/*` | G8 | icon renderer, docs screenshots, tests |
 | `.gitignore` `.gitattributes` | G8 | .gitignore exists (append only); `licenses/* -text` etc. |
+| `tools/guide_capture.py` `tests/test_guide_capture.py` `tests/test_ui_polish_*.py` | ORCH | README / user-guide screenshots of every screen in one demo state (demo desktop, privacy check, geometry JSON) and its tests; the UI polish tests of the screenshot review (U1-U43) and of its integration |
 | `docs/requirements.md` | USER | user requirements (read-only) |
 | `docs/design-preview/*` | ORCH | design preview shown to the user (read-only for groups) |
 | `docs/review/*` | ORCH | SPEC critiques and later review reports (read-only for groups) |
@@ -736,7 +754,7 @@ class ToastManager(QObject)
 # --- autopress/ui/main_window.py
 class MainWindow(QMainWindow)
     __init__(ctx: AppContext); navigate(page_id: str); current_page() -> str; page(page_id: str) -> QWidget | None
-    set_badge(page_id: str, text: str); set_status(key: str, text: str, tone: str = 'neutral')
+    set_badge(page_id: str, text: str, tooltip: str = ''); set_status(key: str, text: str, tone: str = 'neutral')
     set_run_mode(active: bool, minimize: bool = False)
 # --- autopress/ui/settings_page.py
 class SettingsPage(QWidget): __init__(ctx: AppContext)
@@ -825,7 +843,8 @@ class MiniBar(QWidget)
     signals: pauseClicked(); stopClicked(); expandClicked()
     __init__(ctx: AppContext, parent: QWidget | None = None); set_progress(done: int, total: int, eta_s: float)
     set_current(code: str, step_title: str = ''); set_state(state: str, reason: str = '')
-    add_result(status: CodeStatus); place_away_from(avoid: Sequence[Rect] = (), target: Rect | None = None)
+    add_result(status: CodeStatus); set_counts(counts: dict[CodeStatus, int])
+    place_away_from(avoid: Sequence[Rect] = (), target: Rect | None = None)
 # --- autopress/ui/run_flow.py
 class RunFlow(QObject)
     signals: started(); ended(object)
@@ -890,7 +909,7 @@ false}, "coord_mode": "auto", "code_format": {"id": "hoyoverse", "charset": "A-Z
 |---|---|---|---|
 | `focus_window` | 切換到視窗 | restore_minimized (True), timeout_ms 3000, settle_ms 200 | bring the target to front (the runner also does this before every code); failure -> pause FOCUS_LOST |
 | `click_point` | 點擊位置 | point (required), button left, double False, jitter_px 0, settle_ms 30, hold_ms 30, after_ms 120 | resolve with `coord_mode` and the window DPI, +-random jitter, guard (point on target), click, wait |
-| `click_text` | 點擊文字（OCR） | text ("" - must be set; templates use e.g. "兌換\|Redeem"), match exact, region None (= client), nth 0, offset_x/y 0 (px at 96 DPI, x window_dpi / 96), min_score 0.5, upscale 0 (auto), timeout_ms 3000, poll_ms 500, fallback_point None, on_not_found fail, button/double/settle/hold/after | capture -> OCR -> `find_text` (REGEX: the whole text is one pattern); poll until timeout; auto upscale = retry at 2x when not found and the doubled long side stays <= 4096 px; not found -> click fallback_point, else on_not_found: fail -> StepError 「找不到文字「{text}」」, continue -> log 「沒有出現「{text}」，略過這一步」 and go on (dismiss a popup only if it is there) |
+| `click_text` | 點擊文字 | text ("" - must be set; templates use e.g. "兌換\|Redeem"), match exact, region None (= client), nth 0, offset_x/y 0 (px at 96 DPI, x window_dpi / 96), min_score 0.5, upscale 0 (auto), timeout_ms 3000, poll_ms 500, fallback_point None, on_not_found fail, button/double/settle/hold/after | capture -> OCR -> `find_text` (REGEX: the whole text is one pattern); poll until timeout; auto upscale = retry at 2x when not found and the doubled long side stays <= 4096 px; not found -> click fallback_point, else on_not_found: fail -> StepError 「找不到文字「{text}」」, continue -> log 「沒有出現「{text}」，略過這一步」 and go on (dismiss a popup only if it is there) |
 | `type_code` | 輸入序號 | mode unicode, key_delay_ms 15, hold_ms 0, clear_first True, clear_method ctrl_a, split none, separators "-_", group_sizes [] (= code_format.groups), between tab, strip_separators False, verify_region None, after_ms 100 | clear; `codes.normalize.split_code` (NONE: the code exactly as shown in the queue, separators removed only with strip_separators; SEPARATOR: at the separators the code kept from its source, segments may differ in length; FIXED: group sizes); type each segment (VK mode closes the target IME and restores it); Tab between segments when `between` = tab;
 with `clear_first` each later box is SELECTED before its segment (Ctrl+A, or End + Shift+Home; nothing for the
 backspace method) so an old code left in boxes 2..n is replaced - no deleting key, because Backspace in an empty
@@ -920,7 +939,7 @@ confusable groups, and repaired characters are flagged for every source; valid c
 Separators ("-", "_"): formats with groups re-insert `separator` between the groups; formats WITHOUT groups keep the
 source separators as written (so `split = separator` can split them and the code is typed as shown); `code_key`
 ignores them. `flagged` (low OCR confidence below `Settings.ocr.review_threshold` 0.95, or repaired) puts an item
-in REVIEW until confirmed (「已核對」 in the OCR review dialog, 「確認無誤」 in the table) or edited. Look-alikes (0/O/D/Q,
+in REVIEW until confirmed (「確認無誤」 in the OCR review dialog and in the table) or edited. Look-alikes (0/O/D/Q,
 1/I/l/|, 2/Z, 5/S, 6/G, 8/B, U/V, V/Y when both readings are allowed) are only highlighted (`lookalikes`): nearly
 every code contains one (96.8-100 % of random 10- and 16-character codes, measured by the product critique), so
 they cannot block a run. Constrained re-read: OCR requests for code
@@ -1029,25 +1048,43 @@ secondary|muted|caption|mono|error|keycap]`; inputs, combos (`combobox-popup: 0`
 r8, border_strong, accent focus border); QTableView without grid, opaque `row_selected`, caption-style header;
 thin scroll bars; Card / Banner / Sidebar / StatusBar frames; QMenu, QToolTip, QCheckBox, QTabBar; visible focus on
 every focusable control. Avoid container rules that override `role` styling (prototype lesson).
+Disabled single-colour icons (buttons, labels, any QIcon) are drawn in `text_disabled` (`AppStyle.generatedIconPixmap`);
+multi-colour pictures keep Qt's disabled look; every disabled filled button (secondary, primary, danger) has one
+look - the control fill `surface_raised`, the plain `border` and `text_disabled` - so a disabled 開始兌換 looks like a
+disabled 測試一筆 (U26); a disabled segmented control (`QFrame[frameRole="segmented"]`) draws its labels in
+`text_disabled`, the selected segment keeping its fill. Word-wrapped help, hint and template texts keep a short
+「quoted term」 (2-12 characters) on one line (`widgets.keep_quoted`: invisible U+2060 word joiners); format summaries
+join their parts with " ·" + no-break space, so no line ends on a hanging dot; the gallery's meta line
+(`widgets.SeparatedLabel`) wraps only between its parts and drops the dot at the break, so no line starts or ends
+with it, and two lines are balanced. QSS hooks: `QScrollArea[frameRole="inset"]` (framed canvas, 4 px padding),
+`QToolButton[toc="true"]` (current table-of-contents entry: soft nav_active fill, no accent box), a blank
+`QAbstractScrollArea::corner`.
 
 ### 6.3 Shell (G5)
-Sidebar: logo + "AutoPress", nav 序號 Codes (count pill = runnable + review), 設定檔 Profiles, 執行 Run, 紀錄 History;
+Sidebar: logo + "AutoPress", nav 序號 Codes (count pill = runnable + review), 設定檔 Profiles, 執行 Run, 紀錄 History
+(each pill's tooltip says what it counts: 「待處理的序號 {n} 筆：待兌換 {a}、冷卻中 {b}、需確認 {c}」 (zero parts left out),
+「共 {n} 個設定檔」, 「共 {n} 筆紀錄」);
 bottom 設定 Settings, 說明 Help (active item: nav_active fill + 3 px accent bar). Pages in a QStackedWidget; a page
 whose constructor raises NotImplementedError becomes a 「尚未實作」 placeholder. Status bar (always visible, keys of
 `MainWindow.set_status`): `guard` 「前景保護：開」 (always on), `interval` 「間隔 6–8 秒」 (active profile's policy),
 keycaps F8 暫停 · F9 停止 (configured combos) and 「左上角緊急停止：開／關」 (tooltip: which corner counts on this
-monitor layout, from `models.failsafe_corners`), `target` (active profile's window title or 「找不到目標視窗」,
-refreshed every 2 s), `ocr` (載入中 / 就緒 / 無法使用), `run` (state while running). The version line sits in the
+monitor layout, from `models.failsafe_corners`; the left-most-screen sentence only when that corner is the only one
+that counts, otherwise every outer corner is listed; the Settings hint and Help use the same text), `target`
+(「已找到目標視窗：{title}」 - state first, elided on the right, at most 480 px, full title in the tooltip - or
+「找不到目標視窗」 / 「目標視窗：尚未設定」 / 「目標視窗：未選擇設定檔」, refreshed every 2 s and when a page is shown), `ocr` (載入中 / 就緒 / 無法使用), `run` (state while running). The version line sits in the
 sidebar footer as in the mock-up the user saw (`set_status("version", ...)` updates it; integration).
 Toasts: top-right, 4 s, max 3.
 Main window minimum 1100x700 logical, default 1280x800, geometry remembered.
 
 ### 6.4 Pages
-1. **序號 Codes (G6)** - header: title + 「已去除 {d} 筆重複」 note, active-profile combo, buttons 試跑 1 筆 (selected
-   or first runnable code, PlanMode.TEST_ONE) and primary 開始兌換 (both through a page-owned `RunFlow` created
+1. **序號 Codes (G6)** - header: title + 「{n} 筆 · 待處理 {t} · 來自 {s} 個來源」 (待處理 = 待兌換 + 冷卻中 + 需確認 of
+   the shown games: what the sidebar pill counts, in words, U43) + 「已去除 {d} 筆重複」 note, active-profile combo (name only,
+   tooltip 「遊戲：{game}」), buttons 測試一筆 (the Run page's label; selected or first runnable code,
+   PlanMode.TEST_ONE) and primary 開始兌換 (both through a page-owned `RunFlow` created
    lazily on the first click - while G7's RunFlow or `overlays.pick` raise NotImplementedError the click shows a
    「尚未實作」 toast, so `CodesPage(ctx)` always builds; disabled without runnable codes of the active game or
-   without a profile, and a disabled button always says why: tooltip + inline hint). No active profile: generic
+   without a profile, and a disabled button always says why: tooltip + inline hint - with no active profile the
+   no-profile banner is the inline explanation, so the hint is hidden and both tooltips still say why). No active profile: generic
    format, codes are added unassigned, Banner 「先建立或選擇設定檔，才能開始兌換」 + 選擇設定檔. Format combo: 自動偵測
    (`detect_format`; default when the profile format is "generic"), 設定檔格式 (default otherwise), then every preset.
    Toolbar: 貼上文字 (Ctrl+V), 開啟檔案 (Ctrl+O), 圖片辨識 (also drag-drop of images/text files onto the page; when
@@ -1060,10 +1097,17 @@ Main window minimum 1100x700 logical, default 1280x800, geometry remembered.
    inline editing and live validation (`validate_code`), row menu (編輯, 確認無誤 / 重設為待兌換, 略過/取消略過, 移除,
    複製). Bulk bar for the SELECTED rows (the check boxes stay `CodeItem.checked` for 「只跑勾選的」, which is True by
    default - bulk on ticked rows would make 移除 hit every code; integration decision): 移除, 標記為已兌換, 確認無誤, 重設為待兌換, 指定給目前遊戲, 略過, 上移,
-   下移, 移到最上, 重試失敗, 清除已完成, 匯出 CSV. During a run the plan's rows are read-only (「執行中，請先停止」).
-   Empty state with the three import actions and the Ctrl+V keycap tip. Dialogs: PasteDialog (text + live
-   candidates, extraction debounced 300 ms + summary 「將加入 {a} 筆，略過 {d} 筆重複、{h} 筆已兌換過」),
-   OcrReviewDialog (loading / error / no codes states; 「已核對」 / 「全部已核對」 clear `flagged`). Imports call
+   下移, 移到最上, 重試失敗, 清除已完成, 匯出 CSV. The check column is titled 「執行」 / Run (header tooltip: ticks only
+   matter for 「只跑勾選的」; bulk actions work on the highlighted rows); with nothing selected the bulk bar reads
+   「點選序號即可批次操作」; the first untick while `Settings.run_selection` is 全部未完成 shows a one-time info toast
+   per Codes page. During a run the plan's rows are read-only (cell tooltip, toast and row menu 「執行中，請先停止」;
+   the inline hint and both button tooltips 「執行中：這次執行的序號暫時不能修改」) and the profile combo is locked
+   (「執行中無法切換設定檔」, like the Run page). Empty state with the three import actions (the toolbar's labels: 貼上文字 /
+   開啟檔案 / 框選螢幕) and the Ctrl+V keycap tip. Dialogs: PasteDialog (text + live
+   candidates, extraction debounced 300 ms + summary 「將加入 {a} 筆，略過 {d} 筆重複、{h} 筆已兌換過」 - parts with a
+   count of 0 are left out, like the import toast; the source text of a normalised code, 「原文：…」, is shown in the
+   標記 column after the badges, where it has room), OcrReviewDialog (loading / error / no codes states; the tick
+   「確認無誤」 in the column 確認 and 「全部確認無誤」 clear `flagged`; the hint names 標示的字元, no colour words). Imports call
    `ctx.queue.add_candidates(..., history=ctx.history, game_key=profile.game_key(), game=profile.game,
    skip_statuses=settings.history_skip_statuses if settings.skip_history_on_import else ())` (no profile:
    game_key "" and no history skip) and toast the AddResult.
@@ -1071,19 +1115,35 @@ Main window minimum 1100x700 logical, default 1280x800, geometry remembered.
    cards - basics (name, game - an editable combo of the names in `history.games()`, `queue.games()` and the other
    profiles, warning when a new name is close to an existing one (same `squash`, or Levenshtein <= 2); renaming the
    game offers to move the queued codes of the old game with `queue.assign_game` -, description), 目標視窗
-   (WindowPickerDialog; shows exe/title/class and elevation badge; forbidden programs disabled; browsers keep a
-   title keyword), 序號格式 (preset + custom fields), 座標模式, setup checklist banner (from
+   (WindowPickerDialog: title, program and 「內容區大小：W × H」, the window class only in the title's tooltip; 36 px
+   rows; 「建議」 in the program column; warning badges 系統管理員 / 「可能無法輸入」 (was 未知權限) in amber with an
+   icon; a 「以系統管理員身分重新啟動」 button at the bottom left while the selected window is elevated and this
+   account can elevate - accounts that cannot get the standard-user advice; forbidden programs disabled; browsers
+   keep a title keyword; the target card shows only the exe, the class in its tooltip), 序號格式 (preset + custom fields), 座標模式, setup checklist banner (from
    `validate()`/`missing_setup()` with 設定 buttons that open the picker for that field), step list + step editor
    (forms per type, pickers draw the target's client rect, 對齊 for points, the title field edits `label` or
-   `label_en` by UI language), 執行規則 (RunPolicy), 結果關鍵字 (KeywordsEditor). Buttons: 預覽點位 (PreviewOverlay
+   `label_en` by UI language), 執行規則 (RunPolicy), 結果關鍵字 (KeywordsEditor). Layout: the basics, target, format
+   and run-rules cards share one label column; 「● 使用中」 is green; 說明 and 作者 have placeholders; 「長度」 has the
+   hint 「不含分隔符號」 and the format card shows the allowed characters in words (a preset shows only the words, e.g.
+   「英文字母與數字」; the editable rule such as "A-Za-z0-9", with the words under it, appears with 「自訂」); built-in
+   template step names fit the step list at the default window (「框出結果訊息的範圍」, 「關閉結果（若有）」); the step list is 300 px (down to
+   240); point / region fields show the value on its own line with the buttons below; narrow forms put fields
+   under their labels; the editor never scrolls sideways (horizontal bar off; measured zh-TW and English, 100-150 %).
+   The empty profile list says 「還沒有設定檔」 with a hint to the templates and 匯入. Code format summary everywhere
+   (gallery, import card): 「<format> · <characters in words> · <length>」 (+ 「· 分段 5-5-5」). Buttons: 預覽點位 (PreviewOverlay
    6 s), 測試此步驟 (dry run by default; a real test asks the first time 「會真的對目標視窗輸入」, warns when the step
    is at or after `first_submit_index()` 「這一步會送出測試序號「{code}」；有些服務會把它算成一次錯誤嘗試」, then shows
    the countdown, registers the stop hotkey for the test and offers 停止測試 -> `session.stop()`), 儲存 (dirty marker;
    Save / Discard / Cancel on leave; warning before saving a profile from a newer version).
    No profiles -> template gallery (cards from `storage.load_templates()`; create via `profile_from_template`).
-   設定精靈 (guided setup, `start_wizard`) right after creating from a template and after an import: pick the target
-   window, then every `missing_setup()` position and result region in step order (instruction = the step's
-   display_title, e.g. 「點一下序號輸入框」), then 「結果視窗怎麼關？」 (按確定 -> click_text 確定|OK with on_not_found
+   設定精靈 (guided setup, `start_wizard`; every dialog of it, incl. the window picker and the title-keyword dialog,
+   shows 「設定精靈 k/n」 or 「重新對準 k/n」 above its heading - n counts target + positions + close choice + test; the
+   position dialog's heading is the instruction, then 「設定檔的第 n 步：<類型>」 (the type only when the step has a title of
+   its own); 「畫面會暫時定格」, not 凍結) right
+   after creating from a template and after an import: pick the target
+   window, then every `missing_setup()` position and result region in step order (instruction = the step's own
+   title, e.g. 「點一下序號輸入框」; an untitled step says what to pick: 「點選第 2 步要點擊的位置」, 「框出結果訊息的範圍」,
+   in re-align also 「框出第 n 步找文字的範圍」 / 「點選第 n 步找不到文字時改點的位置」 / 「框出第 n 步要核對的輸入框」), then 「選擇結果視窗的關閉方式」 (按確定 -> click_text 確定|OK with on_not_found
    continue / 按 Esc -> key Esc / 不用關), then 預覽點位 and 測試一筆 (with a paste box for one real code when the queue
    has none for this game; the code is queued for the profile's game) - a sequence of the normal pickers,
    cancellable at any point (the checklist remains). 「重新對準」 (`start_wizard(id, realign=True)`, preflight action
@@ -1092,8 +1152,11 @@ Main window minimum 1100x700 logical, default 1280x800, geometry remembered.
    already cleared) -> a warning card: 「這個設定檔會對你選的視窗送出下列按鍵與文字。只匯入你信任的人分享的設定檔。」,
    every `Profile.action_lines()` line verbatim (risky lines highlighted: system / navigation shortcuts, fixed text
    without {code} or with a line break, tab or script URL), the non-default run rules (`Profile.policy_lines()`, loosened
-   safety stops highlighted), the suggested exe and the code format -> 匯入 is enabled only after the checkbox 「我看得懂這些
-   動作」 -> `ProfileStore.import_profile` -> the wizard opens on 「選擇目標視窗」. Export asks for an optional title
+   safety stops highlighted; a warning-icon column keeps the numbers aligned), a facts block (遊戲 / 作者 / 說明 /
+   作者使用的程式 / 序號格式); click_text / wait_text alternatives read 「確定」或「OK」 (a regex stays one pattern); a
+   type_text line with {code} adds 「（{code} 會換成每一筆序號）」 after the literal text; file
+   texts are plain text, never HTML; the dialog is only as tall as its content -> 匯入 is enabled only after the
+   checkbox 「我看得懂這些動作」 -> `ProfileStore.import_profile` -> the wizard opens on 「選擇目標視窗」. Export asks for an optional title
    keyword (`ProfileStore.export_file(profile, path, title_keyword)`; default none, so window titles with account or
    character names are not shared).
 3. **執行 Run (G7)** - active profile, target window (change / refresh), selection 全部未完成 / 只跑勾選的 with the
@@ -1101,27 +1164,55 @@ Main window minimum 1100x700 logical, default 1280x800, geometry remembered.
    `elevation.restart_as_admin()` + quit (the prompt says drag-and-drop from Explorer will not work while elevated),
    pick_window, preview, open_profile, wait_ocr, assign_codes -> `queue.assign_game` of the unassigned codes to the
    profile's game, test_one -> 測試一筆, realign -> `ProfilesPage.start_wizard(id, realign=True)`), buttons 開始兌換
-   (primary), 測試一筆 (first runnable or selected code, PlanMode.TEST_ONE), 預覽點位. Running: ProgressRing,
-   「第 {i} / {n} 筆」, ETA (`format_duration`), current code (mono) and step, state chip, 暫停／繼續 [F8], 停止 [F9], live
-   log (time, level icon, message; auto-scroll), result chips per status. Paused: banner with the PauseReason label +
+   (primary), 測試一筆 (first runnable or selected code, PlanMode.TEST_ONE), 預覽點位. Profile combo: the name only,
+   tooltip 「遊戲：{game}」. Target line 「已找到：{title}」 / 「找不到目標視窗：{target}」 (elided; refreshed when the page
+   is shown and synced with every preflight report). Preflight rows (here and in the sheet) have level icons ✕ /
+   triangle / i and are at least button height; the sheet is as tall as its content (the list scrolls beyond 60 % of
+   the screen). With blocking errors 開始兌換 stays enabled and the hint and its tooltip say 「有 {n} 個問題必須先處理
+   （標示 ✕ 的項目）；按「開始兌換」會再檢查一次。」. During a run the whole setup card is locked (profile, target,
+   selection, 重新檢查, 測試一筆, 開始兌換, 預覽點位; hint 「執行中無法變更設定，要變更請先停止。」, combo tooltip
+   「執行中無法切換設定檔」; the selection segment is drawn greyed too). The count 「未完成 {n} 筆 · 勾選 {m} 筆」
+   includes the code being processed, so it adds up with 「已處理」 during a run. Without runnable codes the hint under
+   開始兌換 is the pre-flight item's own sentence (`messages.pf_no_codes(game)`); the pre-flight note line (「一切就緒。」)
+   takes no space while empty. Running: ProgressRing and heading with the same count 「已處理 {n} / {N} 筆」 (ring tooltip
+   too), ETA (`format_duration`), 「第 {i} / {N} 筆」 (plan index from code_started) before the current code (mono)
+   and its step - once the code has its result 「結果：{status}」 (a retried attempt clears it) -, state chip,
+   暫停／繼續 [F8], 停止 [F9] (hidden while the decision card is shown; F8 / F9 still work), live log (time, level
+   icon, message; auto-scroll; a placeholder line in `text_muted` while empty), result chips per status (one result
+   per code; a new run starts with an empty code row and chips) with 「下一筆 {s} 秒後」 / the cool-down text on the
+   same row (no empty line under the chips). Paused: banner with the PauseReason label +
    繼續 (`RunFlow.resume`: resume countdown). Cool-down: countdown. Attention (shown when RunFlow restores the main
-   window): reason; for unknown / ambiguous results the OCR text, evidence image, 標記為 成功/已使用/無效/已過期/失敗
+   window): reason and 「序號 {code}」; for unknown / ambiguous results the OCR text (once: with the 標記為 buttons the
+   message is 「請選擇這筆序號的結果，或把讀到的文字加入關鍵字。」), evidence image (1 px `border_strong` frame,
+   natural size - one image pixel per screen pixel - shrunk only to 160 px height and the card width; no tooltip with
+   the file path), 標記為 成功/已使用/無效/已過期/失敗
    (`resolve_attention`), 加入關鍵字… (adds to the profile, saves it, `update_keywords`); for errors 開啟紀錄檔;
-   繼續 / 停止. Finished: summary card, 匯出結果 (CSV of this run's records), 重試失敗項目. MiniBar while running (main
-   window hidden): progress ring, current code, result counts, 「下一筆 {s} 秒後」 from `RunSession.waiting`, cool-down
+   繼續 / 停止. Finished: summary card (「「{name}」已處理 {done} / {total} 筆」; the runner message only for rate limit,
+   failures, target lost and errors), 匯出結果 (CSV of this run's records), 重試失敗項目. MiniBar while running (main
+   window hidden): state (the `RunState.label()` words of the Run page: 執行中, 已暫停, 冷卻中 …), progress ring,
+   current code, result counts, 「下一筆 {s} 秒後」 from `RunSession.waiting`, cool-down
    countdown from `cooldown`, 暫停 / 繼續 [F8], 停止 [F9], 展開 (soft pause first), the pause reason for pauses that
-   stay on the bar.
-4. **紀錄 History (G6)** - table: 時間, 序號, 遊戲, 設定檔, 結果 chip, 訊息, 證據 (thumbnail button -> image viewer
-   dialog); search; status and game filters; 重新加入佇列 (as codes of the record's game_key / game), 移除所選,
+   stay on the bar. Fixed width 660 px (720 in English; compact 470); the step elides into the free width; the bar
+   shows the short 「· {s} 秒後重試」; the result chips keep their words while they leave room for a wait text (and,
+   while paused, for the whole pause reason), else they show only their counts with the words in their tooltips, so
+   the wait / pause text is not elided away; a text still too long elides (full sentences in the tooltip); ring tooltip 「已處理 {n} / {N} 筆 ·
+   預估剩餘 …」.
+4. **紀錄 History (G6)** - table: 時間, 序號, 遊戲, 設定檔 (both as wide as their longest entry, at most 140 px, so
+   訊息 gets the rest), 結果 chip, 訊息, 證據 (thumbnail: a crop wider than 2:1 shows a 2:1 window from just left of its
+   content; button -> image viewer
+   dialog: the crop at its natural size - one image pixel per screen pixel, also at 125 / 150 % - top-left in a 1 px
+   frame, the attempt time (finished, else started) in the header); search; status and game filters; 重新加入佇列 (as codes of the record's game_key / game), 移除所選,
    清除全部 (confirm), 匯出 CSV; empty state.
-5. **設定 Settings (G5)** - cards: 一般 (language with 「重新啟動後生效」, theme live, welcome reset), 安全 (failsafe,
+5. **設定 Settings (G5)** - cards: 一般 (language with 「重新啟動後生效」, theme live, welcome reset - hint 「下次啟動時再顯示歡迎畫面與使用原則。」,
+   no rule count), 安全 (failsafe,
    physical-input pause, countdown, resume countdown, confirm threshold, 每日上限 (daily_cap, 0 = off), hotkey
    capture fields with conflict test via a temporary `GlobalHotkeys.register` and immediate unregister), 輸入
    (default typing mode, delays), 文字辨識 (state, error, threads, warm-up, review threshold, 重新啟動引擎 - changes
    apply through `ctx.ocr.restart(settings.ocr)`), 紀錄 (history skip + statuses, evidence keep days, 清除紀錄),
    資料 (data folder path + 開啟資料夾, portable indicator, fallback note), 關於 (version, licenses, GitHub link
    placeholder).
-6. **說明 Help (G5)** - sections: 這是什麼 · 安全守則 (only your codes; official web pages are safer; import profiles
+6. **說明 Help (G5)** - the 本頁內容 table of contents marks the section in view (follows scrolling; a clicked entry
+   stays marked until the page scrolls again); sections: 這是什麼 (says 序號 throughout) · 安全守則 (only your codes; official web pages are safer; import profiles
    only from people you trust - a profile is a list of keystrokes; chat-command redemption (`/redeem`) posts the
    code publicly when the command is wrong; injected input is detectable and some games forbid macros - you are
    responsible; never runs while you play; not legal advice) · 疑難排解 (系統管理員權限 (incl. no drag-and-drop while
@@ -1130,12 +1221,19 @@ Main window minimum 1100x700 logical, default 1280x800, geometry remembered.
    from quarantine or download the zip again)) · 快捷鍵與緊急停止 (which corner counts, drawn for the user's monitor
    layout; games that lock the cursor need F9) · 隱私 (everything stays on this PC; evidence images may show your
    account name).
-Overlays (G7): ScreenPicker (crosshair, 4x magnifier, live physical x/y, instruction, target outline, Esc cancels),
-PreviewOverlay (numbered markers, red when not ok, click-through), CountdownOverlay (3-2-1, click-through, hint line
-with F9 and an arrow to the failsafe corner), MiniBar (never activates; draggable; remembers position; placed with
+Overlays (G7): ScreenPicker (crosshair, 4x magnifier with the crosshair inside and a dark + white outline of the
+picked pixel, live physical x/y, instruction, target outline with an opaque 「目標視窗」 badge just above it - else just
+below it, inside only for a full-screen target -, Esc cancels),
+PreviewOverlay (numbered markers, red when not ok, click-through; `PreviewMark.label` is the step title without a
+number - the badge shows it - and near the screen edges badge and title move to the other side of the mark;
+the picker's instruction pill is opaque), CountdownOverlay (3-2-1 and hint line with F9 on an opaque card,
+click-through; when the failsafe corner is on the same screen the arrow ends at the ring around it and 「緊急停止」 sits
+along the screen edge clear of the arrow, else a short arrow leaves the card towards it), MiniBar (never activates; draggable; remembers position; placed with
 `place_away_from(preview rects, target client rect)` so it avoids click points and OCR regions; its frame is masked
 in every capture and `exclude_from_capture` is applied; pause / resume button disabled 0.7 s after a state change;
-tooltip with the failsafe hint). Welcome dialog (G5) on first run, before the main window.
+tooltip with the failsafe hint). Welcome dialog (G5) on first run, before the main window: four rules; rule 3 reads
+「模擬輸入是偵測得到的，有些遊戲禁止巨集；使用前請先確認該遊戲的規定。」 (pausing on input is explained in Help and
+Settings); the lead-in 「開始之前，請先看看這幾條原則：」 starts its own line.
 States everywhere: empty, loading (Spinner + text), error (Banner with the localized reason and a retry action).
 
 ### 6.5 Accessibility basics
@@ -1150,7 +1248,7 @@ refreshes window lists; spin boxes `setKeyboardTracking(False)` and select-all o
 ### 7.1 Messages (zh-TW / en; use these texts)
 | Situation | Where | Text |
 |---|---|---|
-| target elevated | preflight error, picker badge | 目標程式以系統管理員權限執行，Windows 會無聲阻擋一般權限程式的模擬輸入。請按「以系統管理員身分重新啟動 AutoPress」。 / The target runs as administrator; Windows silently blocks simulated input from normal programs. Click "Restart AutoPress as administrator". |
+| target elevated | preflight error (its row has the button); the window picker and the Profiles target-card tooltip have their own texts that name the picker's button / 「選擇視窗…」 | 目標程式以系統管理員權限執行，Windows 會無聲阻擋一般權限程式的模擬輸入。請按「以系統管理員身分重新啟動」。 / The target runs as administrator; Windows silently blocks simulated input from normal programs. Click "Restart as administrator". Restarting (pre-flight or picker button) confirms, starts the elevated instance and quits (no extra question of its own). |
 | elevation unknown | preflight warning | 無法讀取目標程式的權限（可能是系統或受保護程式）；若輸入沒有反應，請以系統管理員身分執行 AutoPress。 / Cannot read the target's privileges (system or protected program). If input has no effect, run AutoPress as administrator. |
 | standard user, target elevated | preflight error | 此帳戶沒有系統管理員權限，無法對以系統管理員身分執行的程式輸入。若遊戲有網頁兌換頁，請改用網頁。 / This account cannot elevate, so it cannot send input to a program running as administrator. Use the game's web redeem page if it has one. |
 | window not found | preflight error, pause | 找不到目標視窗：{target}。請先開啟遊戲或兌換網頁，或重新選擇視窗。 / Target window not found: {target}. Open the game or redeem page first, or pick the window again. |
@@ -1215,7 +1313,7 @@ pick_window · `target_forbidden` error pick_window · `target_title_required` e
 title keyword) · `target_exe_unknown` error pick_window (no exe and neither a class nor an exact title) · `target_not_found` error pick_window · `target_is_self` error pick_window · `target_multiple`
 warning pick_window (needs a click; the title of the window that will be used is shown) · `target_minimized` info ·
 `elevated` error restart_admin (standard user: no action) · `elevation_unknown` warning · `size_changed` warning
-realign (「視窗大小與錄製時不同（{a} → {b}），將依比例換算；建議先預覽或重新對準」) · `dpi_changed` warning realign ·
+realign (「視窗大小與錄製時不同（{a} → {b}），將依比例換算；建議先預覽或重新對準。」) · `dpi_changed` warning realign ·
 `ocr_failed` error · `ocr_loading` info wait_ocr · `capture_blank` warning (only when the target is not minimized;
 AutoPress's own windows are ignored) · `no_result_check` warning open_profile (7.1 consequence text) · `no_verify`
 info open_profile (type_code without verify_region) · `untested_profile` warning test_one (`last_test_ok_at` empty) ·
@@ -1260,7 +1358,7 @@ initial delays and after_ms), formatted with `format_duration`; rate-limit cool-
 | G3 | `tests/test_win32_*.py` | structure sizes (INPUT 40), argtypes on every prototype, keys mapping/parse_hotkey/combo_from_qt, TargetMatch filtering in find_windows, client_rect/window_info of an own hidden native window (ctypes, works offscreen), elevation of own process, dpi math (pure), failsafe with `models.failsafe_corners` incl. a second monitor LEFT of the primary, wrap-safe tick comparison, InputBlocked on a short SendInput count (mocked), `window_at(skip_own=True)`, `keep_awake`, hotkeys register/1409/unregister (hidden native window, no input), attach on an invalid handle; realinput: typing modes into an own QLineEdit target, clear recipes, clicks, foreground routine, guard trips (ForegroundLost, PointNotOnTarget naming the covering window, same-process roots with allow_same_process), keys and mouse buttons released when the hold's sleep raises (GetAsyncKeyState), clipboard and IME restored on a stop during the restore delay, release_all_modifiers, clipboard snapshot/restore, hotkey delivery while the host window is HIDDEN, `exclude_from_capture` measured with mss on an own window (report the result) |
 | G4 | `tests/test_runner_*.py`, `tests/test_e2e_*.py` | with a fake Backend: every step type, split modes, possibly-submitted rule (`first_submit_index`), StepError after a result kept / after submit REVIEW / before submit FAILED, pause/resume/stop/abort timing (< 100 ms in waits), idempotent pause + USER_INPUT relabel, guard trips -> PENDING/REVIEW, InputBlocked, vanished window -> TARGET_LOST, unexpected exception -> ERROR pause, title change and size change pauses, blank capture pause, masked rects applied to every capture, ocr_check only_new_text (static text, stale previous message, identical message -> UNKNOWN), click_text on_not_found continue, DPI-scaled offsets, rate-limit cool-down then stop, failure counter, invalid streak pause, unknown policy, ETA, bookkeeping (queue + history, missing ids ignored, RUNNING leftovers -> REVIEW, `resolve_attention` via history.update), shutdown delivers the final signals, test_step dry/real, every preflight key, preview marks ignoring own windows, classify delegates to KeywordConfig.classify, build_plan game filter + history-skip + daily cap, waiting signal; realinput e2e against `tools/fake_redeem_app.py`: 5 codes incl. used / invalid / rate-limit, 3-box split and unequal groups, popup dismissal with --popup-on success, --latency-ms with --persist; integration additions: a uniform region never pauses (only a blank client), the title re-checked before input steps, a different window after TARGET_LOST only after confirmation, later boxes selected before their segment (fake app --prefill / --advance-no-select), stop during a cool-down -> PENDING, the resolved status feeds the counters, physical input trips only at injections |
 | G5 | `tests/test_ui_shell_*.py` | theme apply both themes + tokens, QSS builds, icons for every ICON_NAMES/StepType.icon, widgets API, toast stacking, MainWindow navigation + placeholder for NotImplementedError pages, status bar, settings binding and persistence (OCR changes call `ocr.restart`), hotkey field capture, single-instance lock incl. `--wait-lock`, `setQuitOnLastWindowClosed(False)` (closing a parentless dialog while the main window is hidden does not quit), `--selftest` dispatched before a QApplication exists, welcome shown before MainWindow, crash toast text, `set_run_mode(minimize=True)`, data-folder fallback banner, `build_context` with real stores in tmp (`skip_if_stub` for G1/G2/G4 modules) |
-| G6 | `tests/test_ui_codes_*.py`, `tests/test_ui_history_*.py` | CodesPage builds while RunFlow is a stub (lazy creation), model <-> queue events, filters/search/game filter, no-profile and unassigned banners, 確認無誤 / 重設為待兌換 / 指定給, plan rows read-only during a run, lookalike vs flagged painting, inline edit validation, paste dialog extraction (debounced) + summary, OCR review with FakeOcrService (loading, error, results, 已核對 clears flags), drag-drop of text/image files, CSV export, history filters and requeue with the record's game |
+| G6 | `tests/test_ui_codes_*.py`, `tests/test_ui_history_*.py` | CodesPage builds while RunFlow is a stub (lazy creation), model <-> queue events, filters/search/game filter, no-profile and unassigned banners, 確認無誤 / 重設為待兌換 / 指定給, plan rows read-only during a run, lookalike vs flagged painting, inline edit validation, paste dialog extraction (debounced) + summary, OCR review with FakeOcrService (loading, error, results, 確認無誤 clears flags), drag-drop of text/image files, CSV export, history filters and requeue with the record's game |
 | G7 | `tests/test_ui_profiles_*.py`, `tests/test_ui_run_*.py` | profile CRUD + dirty prompt + newer-version warning, template creation, step editor round-trips every step type (anchor, label per language, on_not_found, only_new_text), keyword editor, window picker list (fake list; forbidden exes disabled), import flow (read_file -> action_lines card -> checkbox -> import_profile; target always empty), export title keyword, game combo + near-duplicate warning, wizard (close choice, paste one code, realign), overlays math (local -> physical with fake screens), RunFlow sequence with FakeRunSession (preflight block, confirm, countdown 0, hotkeys registered/unregistered, hotkey failure dialog, run mode, masked rects published, F8 debounce, resume countdown, F9 cancels the countdown, attention restores the main window, expand = soft pause, last_test_ok_at after TEST_ONE), real step test countdown + stop, run page reacting to every RunSession signal, attention actions, mini bar (place_away_from, 0.7 s button lock) |
 | G8 | `tests/test_templates*.py`, `tests/test_packaging*.py` | every template loads with `profile_from_dict`, validates without ERROR except `missing_setup()` positions and result regions, uses only known step types, has bilingual TemplateInfo and `label` + `label_en` on every step, starts with a precondition wait_text, dismisses results with click_text on_not_found continue, in-game template uses VK mode with 30 ms hold; spec file lists rapidocr data + excludes; LICENSE / notices present; build smoke (slow, optional) incl. selftest from a path with Chinese characters; user guide images referenced with relative paths exist |
 
@@ -1268,6 +1366,14 @@ initial delays and after_ms), formatted with `format_duration`; rate-limit cool-
 `.venv/Scripts/python.exe tools/snap_widget.py autopress.ui.codes_page:CodesPage --out <scratch>/codes.png
 [--theme light] [--scale 1.5] [--lang en] [--empty]` builds the demo context (tests/fakes.py) and prints clipped
 labels. Write PNGs to the scratch folder, never into the project (G8's docs images excepted).
+README / user-guide screens: `.venv/Scripts/python.exe tools/guide_capture.py <scratch> --theme dark|light
+[--scale 1.5] [--lang en] [--only a,b] [--geometry]` (`--list` names the 33 screens): one demo state (fixed clock,
+tests/fakes.py), a patched demo desktop (windows, monitors, privileges), a privacy check before any PNG is written,
+a report of clipped labels / cut rows / failed self-checks and, with `--geometry`, widget rects for callouts.
+Pictures agree with each other: one demo profile (tested, web-template step names) and one set of codes on every
+screen (the pre-flight sheet stages a browser window made smaller, a transient 「視窗大小與錄製時不同」 warning);
+evidence crops are cut at the capture's scale (1140 x 210 px at 150 %, as a 150 % monitor gives); run_attention and
+run_summary are drawn as in a window tall enough for the whole page (no page scroll bar narrows their cards).
 
 ### 8.4 `tools/fake_redeem_app.py` (G4)
 See its docstring: unique `--title`, 1 or 3 inputs (or `--groups 4,6,2`), 兌換 / 取消 buttons, deterministic
@@ -1346,7 +1452,8 @@ instructions only after the answer.
 ### 10.4 User guide (G8, requirement R7)
 `docs/user_guide.md` (zh-TW; the README's English section links a short English quick start) built from screenshots
 of the REAL program - never `docs/design-preview` or the research prototype PNGs - with demo data only
-(`tests/fakes.py: demo_context()` or a demo data folder, no real codes). Screens and states: first run (welcome,
+(`tests/fakes.py: demo_context()` or a demo data folder, no real codes), captured with `tools/guide_capture.py`
+(8.3). Screens and states: first run (welcome,
 empty Codes page), Codes page with codes (review banner, filters, bulk bar), paste dialog, OCR review dialog,
 Profiles page (template gallery, editor, import card), setup wizard steps, Run page (preflight list, running,
 paused with attention), mini bar, History page, Settings, Help. Every image gets numbered callouts drawn by
@@ -1379,6 +1486,16 @@ Integration checks R7: every referenced image exists and comes from the real app
     engines that read raw input are unmeasured (unicode VK_PACKET input is invisible to raw input, 0/50). The
     in-game template uses VK mode with IME closing and a 30 ms hold, the wizard's 測試一筆 plus `verify_region` and
     the invalid-streak pause catch a mode that types nothing or the wrong text.
+    Ordering after keys (2026-11-17): in a Qt window with an IME, KEYEVENTF_UNICODE characters overtake ordinary
+    keys and clicks that are still queued in the target. The 0.2 s settle of 2.7.10 fixes this for responsive
+    targets: 0 failures in 150 trials at 0.2 s, including 12 CPU-spinning processes and focus-moving clicks, and 0 in
+    80 trials at 0.05-0.1 s. A target whose GUI thread stalls for longer than about 0.2 s can still get a code
+    without its first characters, or typed into the previously focused box: with stalls of 300 ms every 400 ms, 8-10
+    of 30 codes; with focus-moving clicks added, 3 of 20. Such a code may then be recorded as invalid. No
+    deterministic fix exists from outside the target process: a WM_NULL round trip only lowered the failures to
+    4/30. Remedies: CLIPBOARD or VK mode (ordinary keys only, which keep their order), or a `verify_region` on the
+    type_code step (a mistyped code fails the step with 「輸入內容與序號不符…」 before it is submitted). Browsers were
+    not measured. CHANGELOG known limitations say this for users.
 12. The keyword rule v2 (no bare redeemed / claimed / 過期, fuzzy only from 9 characters, SUCCESS + other class or
     negation -> UNKNOWN) and the only_new_text baseline were checked on text samples only, not on real pages; pages
     that re-render an identical message in place give UNKNOWN 「送出後結果區沒有出現新的訊息（可能和上一筆的訊息
@@ -1458,7 +1575,7 @@ Every item of `docs/review/spec_critique_tech.md` (T01-T41) and `docs/review/spe
 - PX-15 -> accepted: catch-all -> ERROR pause, vanished window -> TARGET_LOST, RUNNING leftovers -> REVIEW, size change -> SIZE_CHANGED pause, OCR timeout / capture / unmappable character map to 7.1 texts (2.2, 2.5, 7.1).
 - PX-16 -> accepted in part: DPI-scaled offset mode (`resolve_point/region(..., dpi)`), preflight `dpi_changed`, action `realign` (wizard re-picks positions, also after imports), anchor selector in the step editor, click_text offsets x dpi / 96; rejected per-point alignment chosen by templates and text-height offsets (deferred, 1.2): per-template coord_mode plus the anchor selector cover these cases without new model concepts (5.2, 5.3, 7.2).
 - PX-17 -> accepted: `read_file` writes and renames nothing, quarantine only inside the data folder, import = read -> summary -> save, export keeps exe / class plus an optional title keyword and never allow_same_process (5.2, 6.4.2).
-- PX-18 -> accepted in part: look-alikes are highlight-only (`lookalikes`), REVIEW only for low-confidence or repaired characters, 已核對 in the OCR review, 確認無誤 in the table; rejected keeping per-item OCR crops (deferred, 1.2): scope - the crop is shown at import and flagged characters stay highlighted (5.4, 6.4.1).
+- PX-18 -> accepted in part: look-alikes are highlight-only (`lookalikes`), REVIEW only for low-confidence or repaired characters, 已核對 in the OCR review (renamed 確認無誤 in the UI polish, last item), 確認無誤 in the table; rejected keeping per-item OCR crops (deferred, 1.2): scope - the crop is shown at import and flagged characters stay highlighted (5.4, 6.4.1).
 - PX-19 -> accepted in part: generic keeps case, "_" / "~" map to "-" only for OCR, groupless formats keep separators, repaired characters are flagged for text sources too, the paste dialog shows raw text next to a changed code; rejected case-sensitive verification: OCR reads the case of c/o/s/u/v/w/x/z unreliably, and the case errors it would catch are removed at the source (5.3, 5.4).
 - PX-20 -> accepted: looks_blank on every runner capture -> CAPTURE_BLANK pause with the 7.1 text; a restored target waits for a stable client rect (max 5 s); preflight `capture_blank` only for a visible target, own windows ignored (2.5, 7.2).
 - PX-21 -> accepted in part: README and guide open with unzip, SmartScreen and antivirus steps, Help section 防毒軟體誤判, `請先解壓縮再執行.txt` in the zip, selftest from a Chinese path, the distribution question is in 10.3; rejected a Chinese top folder name in the zip: an ASCII folder keeps install paths simple and the txt file carries the warning (10.1, 10.3).
@@ -1488,3 +1605,4 @@ Every item of `docs/review/spec_critique_tech.md` (T01-T41) and `docs/review/spe
 - G-12 (gate, integration) -> accepted: manual marks (run_id "manual") are not daily-cap attempts; the Codes page is a history writer (5.1, 5.6).
 - G-10, G-13 - G-25 (gate minors) -> deferred to the next iteration unless already covered (G-16 / G-19 / G-12 handled by G1 / G6; G-25 FILTERS "done" = success/submitted/used decided by G6); see the integration notes.
 - Group decisions confirmed at integration: version line in the sidebar footer (G5, 6.3); bulk actions on selected rows (G6, 6.4.1); only_new_text kept as the safe default (G4, 11.12); 7.1 texts that the table lacks (wait_text timeout, points_missing, no_codes, target_is_self, target_multiple, target_minimized, fast_interval, OCR disabled, target re-bind) live in runner/messages.py with English pairs.
+- UI polish + real-input fix (orchestrator, 2026-11-17/18) -> accepted: a fresh-context review of the screenshots of all 33 screens (both themes at 100 %, spot checks at 150 %) found 43 issues (P1 6 / P2 19 / P3 18); seven fix groups (codes, shell, profiles, run, other, capture, win32) fixed them in parallel, each with tests that fail on the old code (tests/test_ui_polish_*.py, tests/test_guide_capture.py), and the integration applied their cross-file items (one result per code after a decision: worker counters + RunSession re-emits code_finished; Codes combo locked during a run; English Profiles editor fits the smallest window; status-bar target looked up when a page is shown; quoted button labels; two template descriptions trimmed so the gallery has no one-word last lines). The UI changes are in 6.2-6.4 and 7.1; README / guide screenshots come from `tools/guide_capture.py` (8.3, 10.4). Real-input fix (commit "fix(win32): keep Unicode text behind earlier keys in IME targets"): UNICODE text waits TEXT_AFTER_KEYS_SETTLE_S after our keys in IME targets (2.7.10); its limit for stalled targets is in 11.11 and the CHANGELOG; the real-input fixture now restores only changed desktop state, and the new IME test runs at the next real-input gate. Repair round 1 (after a fresh-context verification of the new screenshots): a marked decision is counted also when the run is then stopped, a 冷卻中 choice is one result on every view, and a result marked by hand is not a passed 測試一筆 (a normal run with a read result marks a never-tested profile; the untested warning offers 測試一筆 only with a code) (2.2, 2.4); greyed selection segment, opaque countdown card with the arrow ending at the corner ring, picker badge outside the target and a visible magnifier reticle, framed natural-size evidence on the decision card, the info line on the chips row, quoted terms kept on one line, history columns fitted to their entries (6.2-6.4); the capture's demo profile carries the web template's step names and a passed test, the countdown backdrop moves the browser off the failsafe corner, and the capturing process's elevation never reaches a picture (10.4). Repair round 2 (after the second verification): built-in template step names shortened so they fit the step list (「框出結果訊息的範圍」, 「關閉結果（若有）」, also the wizard's close steps) and an untitled step's wizard position says what to pick (6.4.2); the gallery's meta line wraps only between its parts (`widgets.SeparatedLabel`) and two descriptions were reworded so no card ends on a one-word line (6.2); one disabled look for every filled button (6.2); a preset format shows its allowed characters in words only (6.4.2); the Codes header names the sidebar pill's number as 「待處理 n」 (6.4.1); the mini bar is 720 px wide in English and its chips fall back to counts when they leave no room for the wait / pause text (6.4.3); the restart flow's own Save / Discard question and a normal run marking a never-tested profile were removed again as beyond the listed issues (2.4, 7.1); capture: no word-like row in the paste text, the sheet stages a resized browser instead of an untested profile, evidence crops follow the capture scale and run_attention has no page scroll bar (8.3).

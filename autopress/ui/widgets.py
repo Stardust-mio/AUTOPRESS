@@ -15,6 +15,7 @@ dialog, so ``confirm`` returns True and ``message`` returns at once, exactly lik
 
 from __future__ import annotations
 
+import re
 from collections.abc import Sequence
 
 from PyQt6.QtCore import QPointF, QRectF, QSize, Qt, pyqtSignal
@@ -41,7 +42,7 @@ __all__ = [
     "Banner", "Card", "ChevronCombo", "Divider", "ElidedLabel", "EmptyState", "Keycap", "ProgressRing",
     "SearchField", "SegmentedControl", "Spinner", "StatusChip", "Switch", "combo", "confirm", "form_row",
     "icon_button", "icon_label", "label", "message", "paint_status_chip", "push_button", "section_header",
-    "status_chip_width", "tool_button",
+    "keep_quoted", "SeparatedLabel", "status_chip_width", "tool_button",
 ]
 
 _ICON_TOKEN = {"primary": "on_accent", "danger": "error_text", "ghost": "text_secondary", "secondary": "text_secondary"}
@@ -53,6 +54,18 @@ def _repolish(w: QWidget) -> None:
         style.unpolish(w)
         style.polish(w)
     w.update()
+
+
+WORD_JOINER = "\u2060"
+_QUOTED = re.compile("「([^「」\n]{2,12})」")
+
+
+def keep_quoted(text: str) -> str:
+    """``text`` with every short 「quoted term」 (a button, step or field name) kept on one line:
+    invisible word joiners (U+2060) between its characters, so a narrow word-wrapped label breaks
+    before or after 「模擬鍵入」, never inside it. Terms over 12 characters stay breakable (they
+    might not fit a narrow line at all)."""
+    return _QUOTED.sub(lambda m: "「" + WORD_JOINER.join(m.group(1)) + "」", text)
 
 
 def label(text: str = "", role: str = "body") -> QLabel:
@@ -442,7 +455,9 @@ class EmptyState(QWidget):
                  tip_keys: Sequence[str] = (), tip_text: str = "", parent: QWidget | None = None) -> None:
         super().__init__(parent)
         lay = QVBoxLayout(self)
-        lay.setContentsMargins(theme.SP[6], theme.SP[7], theme.SP[6], theme.SP[7])
+        # 16 px above and below: the stretches centre the content when there is room; tall margins only
+        # raised the minimum height (a scroll bar in the empty code list at 150 % in the smallest window)
+        lay.setContentsMargins(theme.SP[6], theme.SP[4], theme.SP[6], theme.SP[4])
         lay.setSpacing(theme.SP[3])
         lay.addStretch(1)
         lay.addWidget(_EmptyArt(icon_name, self), 0, Qt.AlignmentFlag.AlignHCenter)
@@ -555,6 +570,81 @@ class ElidedLabel(QLabel):
     def resizeEvent(self, event: QResizeEvent | None) -> None:
         super().resizeEvent(event)
         self.update()
+
+
+class SeparatedLabel(QLabel):
+    """Short parts joined by 「 · 」 (the gallery's meta line) that wrap only BETWEEN parts: the
+    dot at a line break is dropped, so no line starts or ends with it, and when two lines are
+    needed the break that balances them is used (UI review U31). A part wider than the label
+    still wraps inside itself."""
+
+    SEP = "\u00a0·\u00a0"  # no-break spaces: the label never breaks at a dot by itself
+
+    def __init__(self, parts: Sequence[str] = (), role: str = "caption", parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setProperty("role", role)
+        self.setTextInteractionFlags(Qt.TextInteractionFlag.NoTextInteraction)
+        self.setWordWrap(True)
+        self._parts: list[str] = []
+        self._flow_w = -1
+        self.set_parts(parts)
+
+    def parts(self) -> list[str]:
+        return list(self._parts)
+
+    def set_parts(self, parts: Sequence[str]) -> None:
+        self._parts = [str(p) for p in parts if str(p)]
+        self._flow_w = -1
+        self.setText(self.SEP.join(self._parts))  # one line until the label knows its width
+        if self._inner_width() > 0:
+            self._reflow(self._inner_width())
+
+    def _inner_width(self) -> int:
+        return self.contentsRect().width() - 2 * self.margin()
+
+    def lines_for(self, width: int) -> list[str]:
+        """The parts flowed into lines of at most ``width`` px."""
+        parts = self._parts
+        if len(parts) <= 1 or width <= 0:
+            return [self.SEP.join(parts)] if parts else []
+        self.ensurePolished()
+        fm = QFontMetrics(self.font())
+
+        def wide(group: Sequence[str]) -> int:
+            return fm.horizontalAdvance(self.SEP.join(group))
+
+        lines: list[list[str]] = [[]]
+        for p in parts:
+            if lines[-1] and wide([*lines[-1], p]) > width:
+                lines.append([])
+            lines[-1].append(p)
+        if len(lines) == 2:  # the break whose longer line is the shortest (still within the width)
+            k = min(range(1, len(parts)), key=lambda i: max(wide(parts[:i]), wide(parts[i:])))
+            if max(wide(parts[:k]), wide(parts[k:])) <= width:
+                lines = [parts[:k], parts[k:]]
+        return [self.SEP.join(line) for line in lines]
+
+    def _reflow(self, width: int) -> None:
+        if width == self._flow_w:
+            return
+        self._flow_w = width
+        text = "\n".join(self.lines_for(width))
+        if text != self.text():
+            self.setText(text)
+
+    def heightForWidth(self, width: int) -> int:
+        m = self.contentsMargins()
+        inner = width - m.left() - m.right() - 2 * self.margin()
+        if inner <= 0:
+            return super().heightForWidth(width)
+        text = "\n".join(self.lines_for(inner))
+        flags = int(self.alignment()) | int(Qt.TextFlag.TextWordWrap)
+        rect = QFontMetrics(self.font()).boundingRect(0, 0, inner, 2000, flags, text)
+        return rect.height() + m.top() + m.bottom() + 2 * self.margin()
+
+    def resizeEvent(self, event: QResizeEvent | None) -> None:
+        super().resizeEvent(event)
+        self._reflow(self._inner_width())
 
 
 def confirm(parent: QWidget | None, title: str, text: str, ok_text: str | None = None,

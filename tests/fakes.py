@@ -6,11 +6,15 @@ if you need different behaviour.
   codes.history.HistoryStore (same method names and semantics, no files).
 * FakeOcrService - returns a configurable OcrResult (``.result``) or fails (``state="failed"``).
 * FakeRunSession - all RunSession signals; records calls in ``.calls``; ``simulate_code()``
-  plays one code through the queue/history bookkeeping for UI tests and screenshots.
+  plays one code through the queue/history bookkeeping for UI tests and screenshots;
+  ``begin_code()`` / ``finish_code()`` / ``finish_run()`` stage a run in the engine's signal order
+  (tools/guide_capture.py); ``preflight_provider`` (a callable) builds live preflight reports.
 * FakeHotkeys - records registrations.
 * demo_context(home) - AppContext with demo data: the REAL CodeQueue/HistoryStore when G1 has
   implemented them (module without ``__stub__``), otherwise the fakes; always fake OCR,
-  session and hotkeys (deterministic, no threads, no input).
+  session and hotkeys (deterministic, no threads, no input). The demo data is one state the
+  real app can show at rest (no RUNNING / COOLDOWN codes; every history record has times);
+  its texts follow the UI language (tr), so English screenshots get English demo data.
 * is_stub(module) / skip_if_stub(*modules) - for tests that need ANOTHER group's real code:
   ``skip_if_stub("autopress.codes.queue")`` skips the test while that module is still a stub.
 """
@@ -20,6 +24,7 @@ from __future__ import annotations
 import importlib
 from collections.abc import Callable, Collection, Iterable, Sequence
 from concurrent.futures import Future
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -29,6 +34,7 @@ from autopress.context import AppContext, AppSignals
 from autopress.i18n import tr
 from autopress.models import (
     AddResult,
+    Attention,
     AttemptRecord,
     ClickPointParams,
     ClickTextParams,
@@ -460,6 +466,8 @@ class FakeRunSession(QObject):
         self._state = RunState.IDLE
         self._plan: RunPlan | None = None
         self.preflight_report: PreflightReport | None = None  # tests may preset one
+        # or a callable (plan) -> PreflightReport, used when no report is preset (live reports)
+        self.preflight_provider: Callable[[RunPlan], PreflightReport] | None = None
         self.masked_rects: list[Rect] = []
 
     @property
@@ -488,6 +496,8 @@ class FakeRunSession(QObject):
 
     def preflight(self, plan: RunPlan) -> PreflightReport:
         self.calls.append(("preflight", (plan.run_id,)))
+        if self.preflight_report is None and self.preflight_provider is not None:
+            return self.preflight_provider(plan)
         return self.preflight_report or PreflightReport(code_count=len(plan.items), ocr_needed=plan.profile.uses_ocr())
 
     def start(self, plan: RunPlan) -> None:
@@ -528,13 +538,16 @@ class FakeRunSession(QObject):
         self.finished.emit(summary)
 
     def resolve_attention(self, code_id: str, status: CodeStatus, message: str = "") -> None:
-        """Queue item + the latest history record of this run for the code (HistoryStore.update)."""
+        """Queue item + the latest history record of this run for the code (HistoryStore.update);
+        during a run code_finished is emitted again with the updated record, like RunSession."""
         self.calls.append(("resolve_attention", (code_id, status, message)))
         self.queue.set_status(code_id, status, message)
         run_id = self._plan.run_id if self._plan else None
         for rec in reversed(self.history.records()):
             if rec.code_id == code_id and (run_id is None or rec.run_id == run_id):
-                self.history.update(rec.id, status=status, message=message or rec.message)
+                updated = self.history.update(rec.id, status=status, message=message or rec.message)
+                if self.is_active():
+                    self.code_finished.emit(code_id, updated)
                 break
 
     def update_keywords(self, keywords: KeywordConfig) -> None:
@@ -554,18 +567,71 @@ class FakeRunSession(QObject):
         self.calls.append(("shutdown", ()))
 
     # -- helpers for tests and screenshots ------------------------------------------------
-    def simulate_code(self, code_id: str, status: CodeStatus, message: str = "", index: int = 0) -> AttemptRecord:
-        """Emit code_started/code_finished for ``code_id`` and apply the bookkeeping."""
-        item = self.queue.get(code_id)
+    def simulate_code(self, code_id: str, status: CodeStatus, message: str = "", index: int = 0,
+                      **record: Any) -> AttemptRecord:
+        """Emit code_started/code_finished for ``code_id`` and apply the bookkeeping.
+        ``record``: optional AttemptRecord fields (started_at, finished_at, result, ...)."""
         self.code_started.emit(code_id, index)
-        rec = AttemptRecord(code_id=code_id, code=item.code if item else "", status=status, message=message,
-                            started_at=now_iso(), finished_at=now_iso(),
-                            run_id=self._plan.run_id if self._plan else "")
+        return self.finish_code(code_id, status, message, **record)
+
+    def begin_code(self, code_id: str, index: int) -> None:
+        """Like the engine when a code starts: the queue item becomes RUNNING (one more
+        attempt), then code_started. Finish it with ``finish_code()``."""
+        item = self.queue.get(code_id)
         if item is not None:
-            self.queue.update(code_id, status=status, message=message, attempts=item.attempts + 1)
+            self.queue.update(code_id, status=CodeStatus.RUNNING, attempts=item.attempts + 1)
+        self.code_started.emit(code_id, index)
+
+    def finish_code(self, code_id: str, status: CodeStatus, message: str = "", **record: Any) -> AttemptRecord:
+        """The bookkeeping of one finished attempt (queue item, history record of this run's
+        profile), then code_finished. ``record``: optional AttemptRecord fields; started_at /
+        finished_at default to now."""
+        item = self.queue.get(code_id)
+        plan = self._plan
+        fields: dict[str, Any] = {
+            "code_id": code_id, "code": item.code if item else "", "status": status, "message": message,
+            "started_at": now_iso(), "finished_at": now_iso(), "run_id": plan.run_id if plan else ""}
+        if plan is not None:
+            p = plan.profile
+            fields.update(game=p.game, game_key=p.game_key(), profile_id=p.id, profile_name=p.name)
+        fields.update(record)
+        rec = AttemptRecord(**fields)
+        if item is not None:
+            attempts = item.attempts if item.status is CodeStatus.RUNNING else item.attempts + 1
+            self.queue.update(code_id, status=status, message=message, attempts=attempts)
         self.history.append(rec)
         self.code_finished.emit(code_id, rec)
         return rec
+
+    def pause_for(self, attention: Attention) -> None:
+        """A decision pause like the worker's: state PAUSED (reason = the attention kind), then
+        the attention signal."""
+        self._set_state(RunState.PAUSED, attention.kind.value)
+        self.attention.emit(attention)
+
+    def finish_run(self, stop_reason: StopReason = StopReason.COMPLETED, message: str = "", *,
+                   counts: dict[CodeStatus, int] | None = None, started_at: str = "",
+                   finished_at: str = "") -> RunSummary:
+        """End the active run like the engine: RUNNING items become REVIEW, COOLDOWN items
+        PENDING, state FINISHED (reason = the stop reason), then ``finished(summary)``."""
+        plan = self._plan
+        items = plan.items if plan else []
+        for it in items:
+            item = self.queue.get(it.code_id)
+            if item is not None and item.status is CodeStatus.RUNNING:
+                self.queue.update(it.code_id, status=CodeStatus.REVIEW)
+            elif item is not None and item.status is CodeStatus.COOLDOWN:
+                self.queue.update(it.code_id, status=CodeStatus.PENDING)
+        counts = dict(counts or {})
+        summary = RunSummary(run_id=plan.run_id if plan else "", profile_id=plan.profile.id if plan else "",
+                             profile_name=plan.profile.name if plan else "", mode=plan.mode if plan else PlanMode.NORMAL,
+                             started_at=started_at or now_iso(), finished_at=finished_at or now_iso(),
+                             total=len(items), done=sum(counts.values()), counts=counts, stop_reason=stop_reason,
+                             message=message)
+        self._plan = None
+        self._set_state(RunState.FINISHED, stop_reason.value)
+        self.finished.emit(summary)
+        return summary
 
 
 class FakeHotkeys(QObject):
@@ -601,27 +667,60 @@ class FakeHotkeys(QObject):
 # ============================================================================= demo data
 
 # invented strings - NOT real codes: (code, source, confidence, flagged, status, message)
+# A state the real app can show at rest: no RUNNING / COOLDOWN items (a run's end turns them into
+# REVIEW / PENDING), and the queue never stores a message for look-alike characters (the code
+# column highlights them). Messages of finished codes are the demo game's result texts.
 DEMO_ROWS: list[tuple[str, CodeSource, float | None, list[int], CodeStatus, str]] = [
     ("AP7K2QX9MZ4T", CodeSource.PASTE, None, [], CodeStatus.SUCCESS, "兌換成功，獎勵已寄至信箱"),
-    ("HV3N8RT2KD6W", CodeSource.PASTE, None, [], CodeStatus.USED, "此兌換碼已被使用"),
-    ("Q8ZL0W3NBX5C", CodeSource.IMAGE, 0.71, [4], CodeStatus.REVIEW, "第 5 碼可能是 0 或 O"),
+    ("HV3N8RT2KD6W", CodeSource.PASTE, None, [], CodeStatus.USED, "此序號已被使用"),
+    ("Q8ZL0W3NBX5C", CodeSource.IMAGE, 0.71, [4], CodeStatus.REVIEW, ""),
     ("MX4T9PK2JR7D", CodeSource.IMAGE, 0.97, [], CodeStatus.PENDING, ""),
     ("ZK6WD2TQ9HNA", CodeSource.FILE, None, [], CodeStatus.PENDING, ""),
-    ("TRV6Y2NCBL1X", CodeSource.SNIP, 0.64, [8, 10], CodeStatus.REVIEW, "B／8、1／I 可能混淆"),
+    ("TRV6Y2NCBL1X", CodeSource.SNIP, 0.64, [8, 10], CodeStatus.REVIEW, ""),
     ("BZ2M5KQ8XH3P", CodeSource.CLIPBOARD, 0.93, [], CodeStatus.PENDING, ""),
-    ("JW8R3TD5QN2K", CodeSource.PASTE, None, [], CodeStatus.INVALID, "兌換碼無效"),
-    ("EK5P9WM3ZT7V", CodeSource.PASTE, None, [], CodeStatus.EXPIRED, "兌換碼已過期"),
-    ("LN7C2XR9PB4Q", CodeSource.SNIP, 0.88, [], CodeStatus.COOLDOWN, "兌換過於頻繁，60 秒後重試"),
+    ("JW8R3TD5QN2K", CodeSource.PASTE, None, [], CodeStatus.INVALID, "序號無效"),
+    ("EK5P9WM3ZT7V", CodeSource.PASTE, None, [], CodeStatus.EXPIRED, "序號已過期"),
+    ("LN7C2XR9PB4Q", CodeSource.SNIP, 0.88, [], CodeStatus.PENDING, ""),
     ("GS4H8NM2VC6R", CodeSource.SNIP, 0.91, [], CodeStatus.SUBMITTED, ""),
-    ("WQ9D3KF7TX2M", CodeSource.FILE, None, [], CodeStatus.FAILED, "找不到「兌換」按鈕"),
+    ("WQ9D3KF7TX2M", CodeSource.FILE, None, [], CodeStatus.FAILED, "角色等級未達 10 級，無法兌換"),
 ]
+
+# English versions of the demo texts (tr() picks one; tests run in zh-TW)
+DEMO_TEXT_EN: dict[str, str] = {
+    "示範：網頁兌換": "Demo: web redeem",
+    "示範遊戲": "Demo Game",
+    "兌換": "Redeem",
+    "兌換成功，獎勵已寄至信箱": "Redeemed - rewards sent to your mailbox",
+    "此序號已被使用": "This code has already been used",
+    "序號無效": "Invalid code",
+    "序號已過期": "This code has expired",
+    "角色等級未達 10 級，無法兌換": "Reach level 10 to redeem this code",
+}
+
+# the result class behind each final demo status (FAILED = not eligible; SUBMITTED = no check)
+DEMO_RESULTS: dict[CodeStatus, ResultClass | None] = {
+    CodeStatus.SUCCESS: ResultClass.SUCCESS, CodeStatus.USED: ResultClass.USED,
+    CodeStatus.INVALID: ResultClass.INVALID, CodeStatus.EXPIRED: ResultClass.EXPIRED,
+    CodeStatus.FAILED: ResultClass.INELIGIBLE, CodeStatus.SUBMITTED: None,
+}
+
+# history: (code, seconds before ``now``, duration ms), oldest first - the newest record is the success
+DEMO_HISTORY: list[tuple[str, int, int]] = [
+    ("WQ9D3KF7TX2M", 1581, 6100), ("GS4H8NM2VC6R", 1307, 3900), ("EK5P9WM3ZT7V", 893, 4600),
+    ("JW8R3TD5QN2K", 548, 4300), ("HV3N8RT2KD6W", 236, 4800), ("AP7K2QX9MZ4T", 0, 5200),
+]
+
+
+def demo_text(zh: str) -> str:
+    """A demo text in the current UI language (DEMO_TEXT_EN; zh-TW otherwise)."""
+    return tr(zh, DEMO_TEXT_EN.get(zh, zh))
 
 
 def demo_profile() -> Profile:
     """A web-redeem style profile with every position recorded (client 1280x720)."""
     client = (100, 50, 1280, 720)
-    p = Profile(name="示範：網頁兌換", game="示範遊戲",
-                target=TargetMatch(exe="chrome.exe", title="兌換", title_mode=TitleMatch.CONTAINS))
+    p = Profile(name=demo_text("示範：網頁兌換"), game=demo_text("示範遊戲"),
+                target=TargetMatch(exe="chrome.exe", title=demo_text("兌換"), title_mode=TitleMatch.CONTAINS))
     steps = [make_step(t) for t in (StepType.FOCUS_WINDOW, StepType.CLICK_POINT, StepType.TYPE_CODE,
                                     StepType.CLICK_TEXT, StepType.OCR_CHECK, StepType.KEY)]
     assert isinstance(steps[1].params, ClickPointParams)
@@ -635,8 +734,9 @@ def demo_profile() -> Profile:
     return p
 
 
-def demo_context(home: Path | None = None, *, with_data: bool = True) -> AppContext:
-    """AppContext for page tests and screenshots (see module docstring)."""
+def demo_context(home: Path | None = None, *, with_data: bool = True, now: datetime | None = None) -> AppContext:
+    """AppContext for page tests and screenshots (see module docstring). ``now``: the time of
+    the newest history record (default: the current time); the others are minutes earlier."""
     import tempfile
 
     from autopress.codes import history as history_mod
@@ -660,26 +760,41 @@ def demo_context(home: Path | None = None, *, with_data: bool = True) -> AppCont
         prof = demo_profile()
         ctx.profiles.save(prof)
         ctx.settings.active_profile_id = prof.id
+        done: dict[str, tuple[str, CodeStatus, str]] = {}  # code -> (queue id, status, message)
         for code, source, conf, flagged, status, message in DEMO_ROWS:
             looks = [n for n, ch in enumerate(code) if ch in "0ODQ1I2Z5S6G8BUVY"] if source.is_ocr else []
             cand = CodeCandidate(code=code, raw=code, flagged=list(flagged), lookalikes=looks,
                                  char_confs=[conf] * len(code) if conf is not None else None)
             res = queue.add_candidates([cand], source, source_detail="demo.png" if source.is_ocr else "",
                                        game_key=prof.game_key(), game=prof.game)
+            text = demo_text(message) if message else ""
             for cid in res.added:
-                queue.update(cid, status=status, message=message)
+                queue.update(cid, status=status, message=text)
                 if status not in (CodeStatus.PENDING, CodeStatus.REVIEW):
-                    history.append(AttemptRecord(run_id="demo", code_id=cid, code=code, game=prof.game,
-                                                 game_key=prof.game_key(), profile_id=prof.id,
-                                                 profile_name=prof.name, status=status,
-                                                 result=ResultClass.SUCCESS if status is CodeStatus.SUCCESS else None,
-                                                 message=message, started_at=now_iso(), finished_at=now_iso(),
-                                                 duration_ms=4200))
+                    done[code] = (cid, status, text)
+        base = now if now is not None else datetime.now()
+        base = base.astimezone()  # naive = local time
+        order = [c for c, _ago, _ms in DEMO_HISTORY if c in done]
+        order += [c for c in done if c not in order]  # rows without a planned time: newest
+        timing = {c: (ago, ms) for c, ago, ms in DEMO_HISTORY}
+        for code in order:
+            cid, status, text = done[code]
+            ago, ms = timing.get(code, (0, 4200))
+            finished = base - timedelta(seconds=ago)
+            started = finished - timedelta(milliseconds=ms)
+            history.append(AttemptRecord(run_id="demo", code_id=cid, code=code, game=prof.game,
+                                         game_key=prof.game_key(), profile_id=prof.id, profile_name=prof.name,
+                                         status=status, result=DEMO_RESULTS.get(status), message=text,
+                                         started_at=started.isoformat(timespec="seconds"),
+                                         finished_at=finished.isoformat(timespec="seconds"), duration_ms=ms))
     return ctx
 
 
 __all__ = [
+    "DEMO_HISTORY",
+    "DEMO_RESULTS",
     "DEMO_ROWS",
+    "DEMO_TEXT_EN",
     "FakeCodeQueue",
     "FakeHistoryStore",
     "FakeHotkeys",
@@ -687,6 +802,7 @@ __all__ = [
     "FakeRunSession",
     "demo_context",
     "demo_profile",
+    "demo_text",
     "is_stub",
     "new_id",
     "skip_if_stub",

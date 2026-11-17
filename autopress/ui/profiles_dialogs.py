@@ -7,12 +7,13 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import QSize, Qt, pyqtSignal
 from PyQt6.QtWidgets import (
     QCheckBox,
     QDialog,
     QGridLayout,
     QHBoxLayout,
+    QLabel,
     QLineEdit,
     QMessageBox,
     QScrollArea,
@@ -40,18 +41,24 @@ def import_warning_text() -> str:
               "Import profiles only from people you trust.")
 
 
-def format_summary(fmt: CodeFormat) -> str:
-    label = fmt.id
-    try:
-        from ..codes import presets
+def format_parts(fmt: CodeFormat) -> list[str]:
+    """The code format in plain words, one part each (never nested brackets or the raw character
+    class): 「HoYoverse（原神／星鐵／絕區零）」, 「英文字母與數字」, 「6–16 碼」 (+ 「分段 5-5-5」)."""
+    from ..codes import presets
 
-        label = presets.format_label(fmt.id)
-    except Exception:  # G1 stub
-        pass
-    groups = "-".join(str(g) for g in fmt.groups)
-    extra = tr(f"，分段 {groups}", f", groups {groups}") if groups else ""
-    return tr(f"{label}（字元 {fmt.charset}，長度 {fmt.min_len}–{fmt.max_len}{extra}）",
-              f"{label} (characters {fmt.charset}, length {fmt.min_len}-{fmt.max_len}{extra})")
+    parts = [presets.format_label(fmt.id), presets.charset_label(fmt.charset, fmt.case_sensitive),
+             presets.length_label(fmt)]
+    if fmt.groups:
+        groups = "-".join(str(g) for g in fmt.groups)
+        parts.append(tr(f"分段\u00a0{groups}", f"groups\u00a0{groups}"))
+    return [p for p in parts if p]
+
+
+def format_summary(fmt: CodeFormat) -> str:
+    """``format_parts`` joined by " · " (a no-break space after the dot, so a wrapped line never
+    ends on it): 「HoYoverse（原神／星鐵／絕區零） · 英文字母與數字 · 6–16 碼」,
+    「Steam · 大寫英文與數字 · 15 碼 · 分段 5-5-5」."""
+    return " ·\u00a0".join(format_parts(fmt))  # a line never ends with a hanging 「·」
 
 
 # ----------------------------------------------------------------------------- save prompt
@@ -119,7 +126,7 @@ class TemplateGallery(QWidget):
         lay = card.layout()
         if tpl is None:
             title, desc = tr("從空白開始", "Start from blank"), tr(
-                "自己決定每一個步驟：點擊位置、輸入序號、按 Enter、辨識結果。",
+                "自己決定步驟：點擊、輸入序號、按 Enter、辨識結果。",  # one line in the gallery card
                 "Build the steps yourself: click, type the code, press Enter, read the result.")
         else:
             info = tpl.template
@@ -128,14 +135,13 @@ class TemplateGallery(QWidget):
         t = w.label(title, "title")
         t.setWordWrap(True)
         lay.addWidget(t)
-        d = w.label(desc, "muted")
+        d = w.label(w.keep_quoted(desc), "muted")  # 「兌換」 never splits across lines
         d.setWordWrap(True)
         lay.addWidget(d)
         if tpl is not None:
             steps = len([s for s in tpl.steps if s.enabled])
-            meta = w.label(tr(f"{steps} 個步驟 · {format_summary(tpl.code_format)}",
-                              f"{steps} steps · {format_summary(tpl.code_format)}"), "caption")
-            meta.setWordWrap(True)
+            # wraps only between its parts and drops the dot there: no line starts or ends with 「·」 (U31)
+            meta = w.SeparatedLabel([tr(f"{steps} 個步驟", f"{steps} steps"), *format_parts(tpl.code_format)], "caption")
             lay.addWidget(meta)
         lay.addStretch(1)
         row = QHBoxLayout()
@@ -191,81 +197,93 @@ def choose_template(templates: Sequence[Profile], parent: QWidget | None) -> tup
 # ----------------------------------------------------------------------------- import card
 
 
+class _FitScrollArea(QScrollArea):
+    """A scroll area only as tall as its word-wrapped content at ``ref_width`` (its width before
+    the first layout), up to ``max_lines`` text lines; then it scrolls. A plain QScrollArea asks
+    the content for its size hint, which wraps every label at a narrow guess and leaves a large
+    empty band in the dialog (U29)."""
+
+    def __init__(self, ref_width: int, max_lines: int = 24, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.ref_width = ref_width
+        self.max_lines = max_lines
+
+    def sizeHint(self) -> QSize:  # noqa: N802 - Qt override
+        sh = super().sizeHint()
+        content = self.widget()
+        if content is None:
+            return sh
+        width = self.viewport().width() if self.isVisible() else self.ref_width
+        h = content.heightForWidth(width) if content.hasHeightForWidth() else -1
+        if h < 0:
+            h = content.sizeHint().height()
+        cap = self.max_lines * self.fontMetrics().height()
+        return QSize(sh.width(), min(h, cap) + 2 * self.frameWidth())
+
+
 class ImportCardDialog(QDialog):
-    """Literal summary of a shared profile; 匯入 only after 「我看得懂這些動作」 (PX-01)."""
+    """Literal summary of a shared profile; 匯入 only after 「我看得懂這些動作」 (PX-01).
+
+    Layout: title, warning banner, a two-column facts block (game, author, description, the
+    author's program, code format), the numbered action lines - risky ones get a warning icon in
+    a fixed-width column, so every number stays aligned - and the non-default run rules. The
+    dialog is only as tall as its content (the action list scrolls past about 24 lines)."""
+
+    ICON_W = 16  # the warning-icon column of the action and rule lines
+    WIDTH = 620  # minimum (and opening) width
+    MARGIN = 20
 
     def __init__(self, profile: Profile, source_name: str = "", parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.profile = profile
         self.setWindowTitle(tr("匯入設定檔", "Import profile"))
-        self.setMinimumSize(620, 520)
+        self.setMinimumWidth(self.WIDTH)
         lay = QVBoxLayout(self)
-        lay.setContentsMargins(20, 16, 20, 16)
+        lay.setContentsMargins(self.MARGIN, 16, self.MARGIN, 16)
         lay.setSpacing(10)
-        lay.addWidget(w.label(tr(f"匯入「{profile.name or source_name}」", f"Import '{profile.name or source_name}'"),
-                              "title"))
+        heading = w.label(tr(f"匯入「{profile.name or source_name}」", f"Import '{profile.name or source_name}'"),
+                          "title")
+        heading.setTextFormat(Qt.TextFormat.PlainText)
+        heading.setWordWrap(True)
+        lay.addWidget(heading)
         self.banner = w.Banner("warning", import_warning_text(), "", False)
         lay.addWidget(self.banner)
         if profile.schema_version > PROFILE_SCHEMA_VERSION:
             lay.addWidget(w.Banner("warning", newer_profile_text(), "", False))
-        meta = []
-        if profile.game:
-            meta.append(tr(f"遊戲：{profile.game}", f"Game: {profile.game}"))
-        if profile.author:
-            meta.append(tr(f"作者：{profile.author}", f"Author: {profile.author}"))
-        if profile.description:
-            meta.append(profile.description)
-        if meta:
-            m = w.label("\n".join(meta), "secondary")
-            m.setWordWrap(True)
-            lay.addWidget(m)
+        lay.addLayout(self._facts(profile))
 
+        lay.addSpacing(2)
         lay.addWidget(w.label(tr("這個設定檔的動作（依順序）", "What this profile does (in order)"), "caption"))
         box = QWidget()
         v = QVBoxLayout(box)
         v.setContentsMargins(0, 0, 0, 0)
         v.setSpacing(4)
         self.action_labels: list[tuple[str, bool]] = []
+        self.action_rows: list[tuple[QLabel, QLabel]] = []  # (icon column, text) per action line
         lines = profile.action_lines()
         for text, risky in lines:
-            lb = w.label(("⚠ " if risky else "") + text, "error" if risky else "body")
-            lb.setWordWrap(True)
-            lb.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
-            if risky:
-                lb.setToolTip(tr("請特別注意：這一行可能切換分頁、開網址列，或每次都輸入同樣的文字。",
-                                 "Check this line: it may switch tabs, open the address bar or type fixed text."))
-            v.addWidget(lb)
+            tip = tr("請特別注意：這一行可能切換分頁、開網址列，或每次都輸入同樣的文字。",
+                     "Check this line: it may switch tabs, open the address bar or type fixed text.") if risky else ""
+            v.addLayout(self._line(text, risky, tip, self.action_rows, selectable=True))
             self.action_labels.append((text, risky))
         if not lines:
             v.addWidget(w.label(tr("（沒有任何啟用的步驟）", "(no enabled steps)"), "muted"))
         self.policy_labels: list[tuple[str, bool]] = profile.policy_lines()  # gate G-02: changed safety stops
+        self.policy_rows: list[tuple[QLabel, QLabel]] = []
         if self.policy_labels:
             v.addSpacing(6)
             v.addWidget(w.label(tr("與預設不同的執行規則", "Run rules that differ from the defaults"), "caption"))
             for text, risky in self.policy_labels:
-                lb = w.label(("⚠ " if risky else "") + text, "error" if risky else "body")
-                lb.setWordWrap(True)
-                if risky:
-                    lb.setToolTip(tr("請特別注意：這條規則關掉或放寬了安全停止。",
-                                     "Check this rule: it switches off or loosens a safety stop."))
-                v.addWidget(lb)
-        v.addStretch(1)
-        scroll = QScrollArea()
+                tip = tr("請特別注意：這條規則關掉或放寬了安全停止。",
+                         "Check this rule: it switches off or loosens a safety stop.") if risky else ""
+                v.addLayout(self._line(text, risky, tip, self.policy_rows))
+        v.addStretch(1)  # a taller dialog (resized by the user) keeps the lines at the top
+        scroll = _FitScrollArea(self.WIDTH - 2 * self.MARGIN)
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QScrollArea.Shape.NoFrame)
         scroll.setWidget(box)
+        self.scroll = scroll
         lay.addWidget(scroll, 1)
-
-        exe = profile.suggested_exe
-        target_text = (tr(f"作者使用的程式：{exe}（只是提示；匯入後要自己選目標視窗）",
-                          f"The author's program: {exe} (a hint only; you pick the target window after importing)")
-                       if exe else tr("匯入後要自己選目標視窗。", "You pick the target window after importing."))
-        t = w.label(target_text, "secondary")
-        t.setWordWrap(True)
-        lay.addWidget(t)
-        f = w.label(tr("序號格式：", "Code format: ") + format_summary(profile.code_format), "secondary")
-        f.setWordWrap(True)
-        lay.addWidget(f)
 
         self.check = QCheckBox(tr("我看得懂這些動作", "I understand these actions"))
         self.check.toggled.connect(self._update)
@@ -281,9 +299,74 @@ class ImportCardDialog(QDialog):
         lay.addLayout(row)
         self._update()
 
+    def _facts(self, profile: Profile) -> QGridLayout:
+        """Two columns, names and values: game, author, description (labelled, U29), the author's
+        program and the code format in plain words. ``fact_labels`` maps name -> value (tests)."""
+        exe = profile.suggested_exe
+        rows = []
+        if profile.game:
+            rows.append((tr("遊戲", "Game"), profile.game))
+        if profile.author:
+            rows.append((tr("作者", "Author"), profile.author))
+        if profile.description:
+            rows.append((tr("說明", "Description"), profile.description))
+        if exe:
+            rows.append((tr("作者使用的程式", "Program the author used"),
+                         tr(f"{exe}（只是提示，匯入後要自己選目標視窗）",
+                            f"{exe} (a hint only; you pick the target window after importing)")))
+        else:
+            rows.append((tr("目標視窗", "Target window"), tr("匯入後要自己選。", "You pick it after importing.")))
+        rows.append((tr("序號格式", "Code format"), format_summary(profile.code_format)))
+        grid = QGridLayout()
+        grid.setContentsMargins(0, 0, 0, 0)
+        grid.setHorizontalSpacing(16)
+        grid.setVerticalSpacing(4)
+        grid.setColumnStretch(1, 1)
+        self.fact_labels: dict[str, str] = {}
+        for n, (name, value) in enumerate(rows):
+            key = w.label(name, "secondary")
+            grid.addWidget(key, n, 0, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
+            val = w.label(value, "body")
+            val.setTextFormat(Qt.TextFormat.PlainText)  # text from a shared file: shown literally, never as HTML
+            val.setWordWrap(True)
+            val.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+            grid.addWidget(val, n, 1)
+            self.fact_labels[name] = value
+        return grid
+
+    def _line(self, text: str, risky: bool, tip: str, rows: list[tuple[QLabel, QLabel]],
+              selectable: bool = False) -> QHBoxLayout:
+        """One numbered line: a fixed-width icon column (warning icon when ``risky``, else empty)
+        and the word-wrapped text, so the numbers of all lines start at the same x."""
+        row = QHBoxLayout()
+        row.setContentsMargins(0, 0, 0, 0)
+        row.setSpacing(6)
+        lb = w.label(text, "error" if risky else "body")
+        lb.setTextFormat(Qt.TextFormat.PlainText)  # literal keys and texts (PX-01), never rendered as HTML
+        lb.setWordWrap(True)
+        if selectable:
+            lb.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        lb.ensurePolished()
+        icon = w.icon_label("alert", "warning", self.ICON_W) if risky else QLabel()
+        icon.setFixedSize(self.ICON_W, max(self.ICON_W, lb.fontMetrics().height()))  # centred on the first line
+        icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        if tip:
+            lb.setToolTip(tip)
+            icon.setToolTip(tip)
+        row.addWidget(icon, 0, Qt.AlignmentFlag.AlignTop)
+        row.addWidget(lb, 1)
+        rows.append((icon, lb))
+        return row
+
     def _update(self) -> None:
         self.import_btn.setEnabled(self.check.isChecked())
         self.import_btn.setDefault(self.check.isChecked())
+
+    def sizeHint(self) -> QSize:  # noqa: N802 - Qt override
+        # at least the opening width, so the first adjustSize() wraps the texts at that width
+        # (not at Qt's narrow guess, which made the dialog far taller than its content)
+        sh = super().sizeHint()
+        return QSize(max(sh.width(), self.WIDTH), sh.height())
 
     def accept(self) -> None:  # noqa: D401 - Qt override
         if self.check.isChecked():
@@ -357,6 +440,7 @@ __all__ = [
     "ask_save_changes",
     "choose_template",
     "confirm_import",
+    "format_parts",
     "format_summary",
     "import_warning_text",
     "newer_profile_text",

@@ -177,7 +177,7 @@ def test_status_target_refresh(window: mw_mod.MainWindow, demo_ctx: Any, monkeyp
     monkeypatch.setattr(windows, "find_window", lambda match: found)
     window.show()  # the 2 s refresh is skipped while the window is hidden (run mode)
     window._refresh_target()
-    assert window.status_text("target") == "目標視窗：兌換中心 - Chrome（已找到）"
+    assert window.status_text("target") == "已找到目標視窗：兌換中心 - Chrome"  # state first (UI review U7)
     monkeypatch.setattr(windows, "find_window", lambda match: None)
     window._refresh_target()
     assert window.status_text("target") == "找不到目標視窗"

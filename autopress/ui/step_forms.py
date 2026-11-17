@@ -43,6 +43,7 @@ from ..models import (
     normalize_combo,
 )
 from ..textutil import clean_text
+from . import theme
 from . import widgets as w
 
 Picker = Callable[[str, str], object]  # (kind "point" | "region", instruction) -> value or None
@@ -97,7 +98,9 @@ class DoubleSpinBox(QDoubleSpinBox):
 
 
 class PositionField(QWidget):
-    """「未設定」 or the recorded value, with 點選位置 / 框選範圍, 清除 and (points) 對齊."""
+    """「未設定」 or the recorded value on the first line (it wraps, never widens the editor),
+    點選位置 / 框選範圍 and 清除 under it, then (points) 對齊. U4: value and buttons on one line
+    made the step form wider than the page."""
 
     changed = pyqtSignal(object)  # ClientPoint | ClientRegion | None
 
@@ -113,10 +116,13 @@ class PositionField(QWidget):
         lay = QVBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
         lay.setSpacing(4)
+        self.value_label = w.label("", "body")
+        self.value_label.setWordWrap(True)
+        self.value_label.setMinimumHeight(theme.CONTROL_H)  # first line level with the form label
+        self.value_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+        lay.addWidget(self.value_label)
         row = QHBoxLayout()
         row.setSpacing(6)
-        self.value_label = w.label("", "body")
-        row.addWidget(self.value_label, 1)
         pick_text = tr("點選位置", "Pick position") if kind == "point" else tr("框選範圍", "Drag region")
         self.pick_btn = w.push_button(pick_text, "secondary", "crosshair" if kind == "point" else "region")
         self.pick_btn.setToolTip(tr("在目標視窗上點選（目標視窗的內容區會被框出來）",
@@ -127,6 +133,7 @@ class PositionField(QWidget):
         self.clear_btn = w.push_button(tr("清除", "Clear"), "ghost")
         self.clear_btn.clicked.connect(lambda: self.set_value(None, emit=True))
         row.addWidget(self.clear_btn)
+        row.addStretch(1)
         lay.addLayout(row)
         self.anchor = None
         if kind == "point":
@@ -216,9 +223,12 @@ class StepForm(QWidget):
         lay = QVBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
         lay.setSpacing(8)
+        # WrapLongRows: in a narrow window a field moves under its label instead of making the
+        # whole profile editor scroll sideways (U4)
         self.main = QFormLayout()
         self.main.setLabelAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
         self.main.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow)
+        self.main.setRowWrapPolicy(QFormLayout.RowWrapPolicy.WrapLongRows)
         self.main.setHorizontalSpacing(16)
         self.main.setVerticalSpacing(8)
         lay.addLayout(self.main)
@@ -230,6 +240,9 @@ class StepForm(QWidget):
         self.adv_box = QWidget()
         self.adv = QFormLayout(self.adv_box)
         self.adv.setContentsMargins(0, 0, 0, 0)
+        self.adv.setLabelAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+        self.adv.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow)
+        self.adv.setRowWrapPolicy(QFormLayout.RowWrapPolicy.WrapLongRows)
         self.adv.setHorizontalSpacing(16)
         self.adv.setVerticalSpacing(8)
         self.adv_box.hide()
@@ -258,7 +271,7 @@ class StepForm(QWidget):
             v.setContentsMargins(0, 0, 0, 0)
             v.setSpacing(2)
             v.addWidget(widget)
-            hl = w.label(hint, "muted")
+            hl = w.label(w.keep_quoted(hint), "muted")  # 「模擬鍵入」 never splits across lines
             hl.setWordWrap(True)
             v.addWidget(hl)
             form.addRow(label, box)
@@ -349,6 +362,10 @@ class StepForm(QWidget):
     def choice(self, name: str, text: str, items: Sequence[tuple[Any, str]], advanced: bool = False,
                hint: str = "") -> QComboBox:
         cb = QComboBox()
+        # the field grows to the full width anyway; a long choice (「不按（輸入框會自動跳格）」) must not
+        # set the form's minimum width (U4): elided only in a very narrow window
+        cb.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
+        cb.setMinimumContentsLength(8)
         current = getattr(self.step.params, name)
         for value, label in items:
             cb.addItem(label, value.value if isinstance(value, Enum) else value)
@@ -422,8 +439,10 @@ def _upscale_items() -> list[tuple[int, str]]:
 
 def _click_text(f: StepForm) -> None:
     f.text("text", tr("要點擊的文字", "Text to click"), "兌換|Redeem",
-           hint=tr("多個候選用 | 分隔（例如 兌換|Redeem|確認）；正規表示式模式下整段是一個式子。",
-                   "Separate alternatives with | (e.g. Redeem|OK); in regex mode the whole text is one pattern."))
+           hint=tr("AutoPress 用文字辨識在畫面上找到這段文字並點它。多個候選用 | 分隔（例如 兌換|Redeem|確認）；"
+                   "正規表示式模式下整段是一個式子。",
+                   "AutoPress finds this text on the screen with text recognition and clicks it. Separate "
+                   "alternatives with | (e.g. Redeem|OK); in regex mode the whole text is one pattern."))
     f.enum_choice("match", tr("比對方式", "Matching"), TextMatch)
     f.position("region", tr("搜尋範圍", "Search region"), "region",
                f.instruction(tr("框出要找文字的範圍", "Drag the area to search")),
@@ -440,7 +459,7 @@ def _click_text(f: StepForm) -> None:
     f.spin("offset_x", tr("點擊位置水平偏移", "Click offset X"), tr(" 像素", " px"), advanced=True,
            hint=tr("以 100% 縮放的像素計，會依視窗縮放比例換算", "Pixels at 100 % scaling; scaled with the window DPI"))
     f.spin("offset_y", tr("點擊位置垂直偏移", "Click offset Y"), tr(" 像素", " px"), advanced=True)
-    f.dspin("min_score", tr("最低辨識信心", "Minimum OCR score"), advanced=True)
+    f.dspin("min_score", tr("最低辨識信心", "Minimum recognition confidence"), advanced=True)
     f.choice("upscale", tr("放大辨識", "Upscale"), _upscale_items(), advanced=True)
     f.ms("poll_ms", tr("重新辨識間隔", "Poll interval"), advanced=True)
 
@@ -476,7 +495,7 @@ def _type_code(f: StepForm) -> None:
     f.enum_choice("between", tr("段與段之間", "Between segments"), BetweenSegments)
     f.switch("strip_separators", tr("輸入前移除分隔符號", "Remove separators before typing"))
     f.position("verify_region", tr("核對範圍", "Verify region"), "region",
-               tr("框出序號輸入框（輸入後用文字辨識核對）", "Drag around the code box (checked by OCR after typing)"),
+               tr("框出序號輸入框（輸入後用文字辨識核對）", "Drag around the code box (checked by text recognition after typing)"),
                none_text=tr("未設定（可不設）", "Not set (optional)"),
                hint=tr("設定後會辨識輸入框的內容，跟序號不符就停下來，避免輸入法改寫。",
                        "When set, the box is read after typing and a mismatch stops the code."))

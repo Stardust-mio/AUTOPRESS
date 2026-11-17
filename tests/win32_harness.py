@@ -1,7 +1,10 @@
 # OWNED BY G3
 """Launch / observe tests/win32_target_app.py for the G3 realinput tests (modelled on
 docs/research/scripts/win32/wa_harness.py). The HWND and pid come from the target's own info
-file - never from the Popen pid (the venv python.exe is a launcher stub)."""
+file - never from the Popen pid (the venv python.exe is a launcher stub).
+
+``desktop_state_restored()`` saves and restores what a realinput test may change on the user's
+desktop; tests/conftest.py wraps every test marked ``realinput`` in it."""
 
 from __future__ import annotations
 
@@ -9,7 +12,9 @@ import json
 import subprocess
 import sys
 import time
-from collections.abc import Callable, Sequence
+import warnings
+from collections.abc import Callable, Iterator, Sequence
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
@@ -21,6 +26,51 @@ WM_CLOSE = 0x0010
 def center(rect: Sequence[int]) -> tuple[int, int]:
     x, y, w, h = rect
     return x + w // 2, y + h // 2
+
+
+def caps_lock_on() -> bool:
+    from autopress.win32 import api
+
+    return bool(api.GetKeyState(api.VK_CAPITAL) & 1)
+
+
+@contextmanager
+def desktop_state_restored() -> Iterator[None]:
+    """Save what a realinput test may change on the user's desktop and put it back afterwards: keys
+    and mouse buttons still down (release_all_modifiers), CapsLock, the clipboard (all formats;
+    written back only when its sequence number changed) and the cursor position. Create the
+    QApplication first (per-monitor-v2: the cursor position is then in physical pixels). A restore
+    step that Windows refuses becomes a warning, never an error of the test."""
+    from autopress.win32 import api, clipboard
+    from autopress.win32 import input as inp
+
+    try:
+        snap: Any = clipboard.snapshot()
+    except inp.ClipboardBusy:
+        snap = None
+    seq = int(api.GetClipboardSequenceNumber())  # read after the snapshot, which may render delayed formats
+    caps = caps_lock_on()
+    cursor = api.cursor_pos()
+    try:
+        yield
+    finally:
+        problems: list[str] = []
+        inp.release_all_modifiers()
+        if caps_lock_on() != caps:
+            try:
+                inp._send([inp._vk_event(api.VK_CAPITAL, False), inp._vk_event(api.VK_CAPITAL, True)], "capslock")
+                time.sleep(0.15)
+            except inp.InputBlocked as exc:
+                problems.append(f"CapsLock not restored: {exc}")
+        if snap is not None and int(api.GetClipboardSequenceNumber()) != seq:
+            try:
+                clipboard.restore(snap)
+            except inp.ClipboardBusy as exc:
+                problems.append(f"clipboard not restored: {exc}")
+        if cursor is not None and api.cursor_pos() != cursor:
+            api.SetCursorPos(*cursor)
+        for text in problems:
+            warnings.warn(f"realinput teardown: {text}", UserWarning, stacklevel=2)
 
 
 class TargetApp:

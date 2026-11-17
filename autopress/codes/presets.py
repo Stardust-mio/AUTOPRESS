@@ -25,10 +25,11 @@ then to the earlier id in BUILTIN_FORMAT_IDS (so generic wins among the free-len
 
 from __future__ import annotations
 
+import string
 from dataclasses import replace
 
 from ..i18n import tr
-from ..models import CodeFormat
+from ..models import CodeFormat, expand_charset
 
 BUILTIN_FORMAT_IDS: tuple[str, ...] = (
     "generic", "hoyoverse", "wuthering_waves", "blue_archive", "steam", "xbox", "nintendo", "custom",
@@ -96,6 +97,60 @@ def format_shape(fmt: CodeFormat) -> str:
 def format_example(format_id: str) -> str:
     """Shape hint for the UI, e.g. "XXXXX-XXXXX-XXXXX" (never a real code)."""
     return format_shape(get_format(format_id))
+
+
+_UPPER, _LOWER, _DIGITS = set(string.ascii_uppercase), set(string.ascii_lowercase), set(string.digits)
+NB_HYPHEN = "\u2011"  # non-breaking hyphen: a raw charset like A-F0-9 never wraps as "A-" / "F0-9"
+
+
+def _raw_charset(charset: str) -> str:
+    return (charset or "").replace("-", NB_HYPHEN)
+
+
+def charset_label(charset: str, case_sensitive: bool = True) -> str:
+    """Plain words for a code character set (gamers never see "A-Za-z0-9"):
+    letters + digits -> "英文字母與數字" / "letters and digits"; A-Z0-9, or letters that are
+    upper-cased because the format is not case-sensitive -> "大寫英文與數字" / "capital letters and
+    digits"; up to four capital letters left out are named (Nintendo: "大寫英文與數字，不含 I、O、Z"
+    / "capital letters and digits except I, O and Z"); digits only -> "數字" / "digits". Any other
+    set is shown as written, with non-breaking hyphens."""
+    try:
+        chars = set(expand_charset(charset))
+    except ValueError:
+        return _raw_charset(charset)
+    if not case_sensitive:
+        chars = {c.upper() for c in chars}
+    digits = chars & _DIGITS
+    letters = chars - _DIGITS
+    if digits and digits != _DIGITS:
+        return _raw_charset(charset)
+    missing: list[str] = []
+    if letters == _UPPER | _LOWER:
+        zh, en = "英文字母", "letters"
+    elif letters == _LOWER:
+        zh, en = "小寫英文", "lowercase letters"
+    elif letters and letters <= _UPPER and len(_UPPER - letters) <= 4:
+        zh, en = "大寫英文", "capital letters"
+        missing = sorted(_UPPER - letters)
+    elif not letters:
+        return tr("數字", "digits")
+    else:
+        return _raw_charset(charset)
+    if digits:
+        zh, en = zh + "與數字", en + " and digits"
+    if missing:
+        en_list = missing[0] if len(missing) == 1 else ", ".join(missing[:-1]) + " and " + missing[-1]
+        zh, en = zh + "，不含 " + "、".join(missing), en + " except " + en_list
+    return tr(zh, en)
+
+
+def length_label(fmt: CodeFormat) -> str:
+    """"6–16 碼" / "6–16 characters" ("15 碼" for a fixed length); separators are not counted.
+    The number and its unit never wrap apart (no-break space, word joiner after the en dash - in
+    both languages: an ASCII hyphen could still wrap as "6-" / "16 characters")."""
+    if fmt.min_len == fmt.max_len:
+        return tr(f"{fmt.min_len}\u00a0碼", f"{fmt.min_len}\u00a0characters")
+    return tr(f"{fmt.min_len}–\u2060{fmt.max_len}\u00a0碼", f"{fmt.min_len}–\u2060{fmt.max_len}\u00a0characters")
 
 
 def _specificity(fmt: CodeFormat) -> int:

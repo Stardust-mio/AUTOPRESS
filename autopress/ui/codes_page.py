@@ -5,16 +5,22 @@ profile + code format, game filter (active profile's game + unassigned; 「所�
 status filter, the queue table, banners (no profile; unassigned codes; review), bulk actions,
 empty state; switch 略過已兌換過的序號 (Settings.skip_history_on_import); bulk 移除 / 標記為已兌換
 (SUCCESS + a history record) / 略過 / 確認無誤 and 重設為待兌換 (queue.reset) / 指定給目前遊戲
-(queue.assign_game); buttons 試跑 1 筆 and 開始兌換 run through a page-owned ui.run_flow.RunFlow
-that is created LAZILY on first click - while G7's RunFlow (or overlays.pick) still raises
-NotImplementedError the click shows a 「尚未實作」 toast, so CodesPage(ctx) always builds (T11).
-Disabled buttons say why (tooltip + inline hint). During a run the items of the active plan are
-read-only (edit / remove / move disabled, 「執行中，請先停止」).
+(queue.assign_game); buttons 測試一筆 (the Run page's label) and 開始兌換 run through a page-owned
+ui.run_flow.RunFlow that is created LAZILY on first click - while G7's RunFlow (or overlays.pick)
+still raises NotImplementedError the click shows a 「尚未實作」 toast, so CodesPage(ctx) always
+builds (T11). Disabled buttons say why (tooltip + inline hint; without a profile the no-profile
+banner is the inline explanation, so the hint does not repeat it). During a run the items of the
+active plan are read-only (edit / remove / move disabled, 「執行中，請先停止」) and the inline hint
+says so (「執行中：這次執行的序號暫時不能修改」), which also explains their grey check boxes; the
+profile combo is locked too (「執行中無法切換設定檔」, like the Run page's setup card).
 
 Layout notes: the 略過已兌換過的序號 switch sits in the import card (it is an import option) and
 the table card's top row holds the 6 status segments, the game filter and the search, so the page
 fits the 1100 px minimum window. Bulk actions act on the SELECTED rows; the check boxes are
-``CodeItem.checked`` (「只跑勾選的」). Import dialogs open window-modal (``open()``), one at a time.
+``CodeItem.checked`` (「只跑勾選的」) in a column titled 執行, and with no row selected the bulk bar
+says how to select instead of 「已選取 0 筆」. Unticking a code while the run setting is 「全部未完成」
+shows a one-time toast (the tick changes nothing in that mode). Import dialogs open window-modal
+(``open()``), one at a time.
 """
 
 from __future__ import annotations
@@ -65,6 +71,7 @@ class CodesPage(CodesLayoutMixin, CodesImportsMixin, CodesActionsMixin, QWidget)
         self._game_keys: list[str | None] = []
         self._dialog: QDialog | None = None
         self._pending: deque[Callable[[], None]] = deque()
+        self._uncheck_note_shown = False  # the 「全部未完成」 untick toast is shown once per page
         self._last_dir = ""
         self._format_cache: dict[str, object] = {}
         self._refresh_timer = self._timer(self.refresh)  # coalesces queue events into one refresh
@@ -189,8 +196,16 @@ class CodesPage(CodesLayoutMixin, CodesImportsMixin, CodesActionsMixin, QWidget)
         active = self._profile.id if self._profile is not None else ""
         combo.setPlaceholderText(tr("選擇設定檔…", "Choose a profile…") if profiles else tr("沒有設定檔", "No profiles"))
         combo.setCurrentIndex(next((n for n, p in enumerate(profiles) if p.id == active), -1))
-        combo.setEnabled(bool(profiles))
         combo.blockSignals(False)
+        self._sync_profile_combo_lock()
+
+    def _sync_profile_combo_lock(self) -> None:
+        """While a run is active (also paused) the header combo cannot switch the active profile:
+        the Run page's setup card, which describes that run, is locked the same way (same tooltip)."""
+        running = bool(self.ctx.session.is_active())
+        combo = self._profile_combo
+        combo.setEnabled(combo.count() > 0 and not running)
+        combo.setToolTip(tr("執行中無法切換設定檔", "You cannot switch profiles during a run") if running else "")
 
     def _on_profile_activated(self, index: int) -> None:
         pid = self._profile_combo.itemData(index)
@@ -313,6 +328,11 @@ class CodesPage(CodesLayoutMixin, CodesImportsMixin, CodesActionsMixin, QWidget)
             text = tr("尚未新增序號", "No codes yet")
         else:
             parts = [tr("{n} 筆", "{n} codes").format(n=len(scope))]
+            # what the sidebar's 序號 pill counts (待兌換 + 冷卻中 + 需確認), in words next to the total, so
+            # a picture of the page explains the pill without its tooltip (UI review U43)
+            todo = sum(1 for it in scope if it.status in (CodeStatus.PENDING, CodeStatus.COOLDOWN, CodeStatus.REVIEW))
+            if todo:
+                parts.append(tr("待處理 {t}", "{t} to do").format(t=todo))
             sources = len({it.source for it in scope})
             if sources > 1:
                 parts.append(tr("來自 {s} 個來源", "from {s} sources").format(s=sources))
@@ -356,7 +376,10 @@ class CodesPage(CodesLayoutMixin, CodesImportsMixin, CodesActionsMixin, QWidget)
     def _update_bulk_bar(self, *_args: object) -> None:
         items = self.selected_items()
         free = [it for it in items if self._model.can_edit(it)]
-        self._sel_label.setText(tr("已選取 {n} 筆", "{n} selected").format(n=len(items)))
+        # the ticks (執行 column) are not the selection: with nothing selected, say how to select
+        # instead of "0 selected" next to a column of ticks
+        self._sel_label.setText(tr("已選取 {n} 筆", "{n} selected").format(n=len(items)) if items
+                                else tr("點選序號即可批次操作", "Select codes for bulk actions"))
         for b in (self._btn_remove, self._btn_up, self._btn_down):
             b.setEnabled(bool(free))
         self._btn_mark.setEnabled(any(it.status is not CodeStatus.SUCCESS for it in free))
@@ -372,9 +395,10 @@ class CodesPage(CodesLayoutMixin, CodesImportsMixin, CodesActionsMixin, QWidget)
 
     # =========================================================================== run
     def run_status(self) -> tuple[bool, str, bool, str]:
-        """(開始兌換 enabled, its tooltip / reason, 試跑 1 筆 enabled, its tooltip / reason)."""
+        """(開始兌換 enabled, its tooltip / reason, 測試一筆 enabled, its tooltip / reason)."""
         if self.ctx.session.is_active():
-            reason = tr("正在執行中", "A run is in progress")
+            # shown as the inline hint too, so it also explains the grey (locked) rows of the plan
+            reason = tr("執行中：這次執行的序號暫時不能修改", "A run is in progress: its codes are read-only")
             return False, reason, False, reason
         p = self._profile
         if p is None:
@@ -407,7 +431,9 @@ class CodesPage(CodesLayoutMixin, CodesImportsMixin, CodesActionsMixin, QWidget)
         self._start_btn.setToolTip(start_tip)
         self._test_btn.setEnabled(test_ok)
         self._test_btn.setToolTip(test_tip)
-        hint = "" if start_ok else start_tip
+        # without a profile the no-profile banner right below already says it: do not repeat it
+        said_by_banner = self._profile is None and start_tip == str(NO_PROFILE)
+        hint = "" if start_ok or said_by_banner else start_tip
         self._run_hint.setText(hint)
         self._run_hint.setVisible(bool(hint))
 
@@ -434,7 +460,7 @@ class CodesPage(CodesLayoutMixin, CodesImportsMixin, CodesActionsMixin, QWidget)
         return self._run_flow
 
     def start_run(self, test_one: bool = False) -> bool:
-        """開始兌換 / 試跑 1 筆 through the page's RunFlow (created on first use)."""
+        """開始兌換 / 測試一筆 through the page's RunFlow (created on first use)."""
         start_ok, reason, test_ok, test_reason = self.run_status()
         if not (test_ok if test_one else start_ok):
             self.ctx.notify(test_reason if test_one else reason, "warning")
@@ -456,10 +482,12 @@ class CodesPage(CodesLayoutMixin, CodesImportsMixin, CodesActionsMixin, QWidget)
             return False
 
     def _on_run_state(self, _state: str, _reason: str) -> None:
-        """While a run is active (also paused) the rows of its plan are read-only."""
+        """While a run is active (also paused) the rows of its plan are read-only and the profile
+        combo is locked."""
         session = self.ctx.session
         plan = session.plan if session.is_active() else None
         self._model.set_locked([i.code_id for i in plan.items] if plan is not None else [])
+        self._sync_profile_combo_lock()
         self._update_bulk_bar()
 
     def _on_run_finished(self, _summary: object) -> None:

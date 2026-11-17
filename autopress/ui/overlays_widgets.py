@@ -6,10 +6,15 @@ everything is drawn in the screen's local logical coordinates and converted with
 ui.overlays_geom (``phys = origin + qRound(local * dpr)``), never through global logical
 coordinates (win32_windows.md section 5).
 
-* PickerOverlay  - interactive: frozen screenshot, crosshair, 4x magnifier, live physical x/y,
-  instruction, target client rect outline, rubber band (region) or window outline (window).
-* MarksOverlay   - click-through: numbered PreviewMarks (red when not ok).
-* CountdownWidget - click-through: big 3-2-1 digit, hint line, arrow to the failsafe corner.
+* PickerOverlay  - interactive: frozen screenshot, crosshair, 4x magnifier (crosshair and a
+  two-tone pixel outline, visible on white pages too), live physical x/y, instruction (an opaque
+  pill drawn over the guides), target client rect outline with an opaque badge outside it when
+  there is room, rubber band (region) or window outline (window).
+* MarksOverlay   - click-through: PreviewMarks with a number badge and the step title beside it
+  (red when not ok); near a screen edge badge and title move to the other side of the mark
+  (place_point_mark / place_rect_mark), so a title never covers its own badge.
+* CountdownWidget - click-through: big 3-2-1 digit and hint line on an opaque card, an arrow
+  that ends at the ring around the failsafe corner (towards it when the corner is on another screen).
 """
 
 from __future__ import annotations
@@ -20,7 +25,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 from PyQt6.QtCore import QPointF, QRect, QRectF, Qt
-from PyQt6.QtGui import QColor, QFont, QImage, QPainter, QPainterPath, QPen, QPolygonF
+from PyQt6.QtGui import QColor, QFont, QFontMetricsF, QImage, QPainter, QPainterPath, QPen, QPolygonF
 from PyQt6.QtWidgets import QWidget
 
 from ..i18n import tr
@@ -33,6 +38,12 @@ if TYPE_CHECKING:
 
 MAG_BOX = 128  # magnifier size (logical px)
 MAG_ZOOM = 4
+PILL_FILL = QColor(28, 32, 39)  # instruction pill: opaque, so no guide line runs through its text
+BADGE = 22.0  # number badge of a preview mark (logical px)
+LABEL_GAP = 4.0  # between a badge and its title
+RING_R = 15.0  # ring of a point mark
+CORNER_RING_R = 22.0  # ring around the failsafe corner (countdown)
+CORNER_ARROW_MAX = 110.0  # longest countdown arrow towards a corner on the same screen
 
 
 def _color(token: str, fallback: str) -> QColor:
@@ -112,12 +123,123 @@ def _label_box(p: QPainter, anchor: QPointF, text: str, fg: QColor, bg: QColor, 
     x = min(max(bounds.left() + 2, anchor.x()), bounds.right() - w - 2)
     y = min(max(bounds.top() + 2, anchor.y()), bounds.bottom() - h - 2)
     box = QRectF(x, y, w, h)
+    _draw_box(p, box, text, fg, bg)
+    return box
+
+
+def target_badge_anchor(target: QRectF, bounds: QRectF, font: QFont) -> QPointF:
+    """Top-left of the picker's 「目標視窗」 badge (a _label_box of ``font``): just above the target
+    window's outline, else just below it, so it labels the outline without covering the window's
+    content; inside the top-left corner only when the window fills the screen."""
+    fm = QFontMetricsF(font)
+    h = fm.height() + 8
+    if target.top() - h - 2 >= bounds.top() + 2:
+        return QPointF(target.left(), target.top() - h - 2)
+    if target.bottom() + 2 + h <= bounds.bottom() - 2:
+        return QPointF(target.left(), target.bottom() + 2)
+    return QPointF(target.left() + 6, target.top() + 6)
+
+
+def corner_label_anchor(corner: QPointF, inward: QPointF, text: str, font: QFont) -> QPointF:
+    """Top-left of the countdown's 「緊急停止」 box (a _label_box of ``text`` / ``font``) next to the
+    ring around a screen ``corner``. ``inward`` is the unit direction from the corner to where the
+    arrow comes from: the box goes along the screen edge the arrow runs farther from, just past
+    the arrow, so it never covers the arrow head and stays close to the ring."""
+    fm = QFontMetricsF(font)
+    w, h = fm.horizontalAdvance(text) + 14, fm.height() + 8
+    ax, ay = abs(inward.x()), abs(inward.y())
+    sx, sy = (1 if inward.x() >= 0 else -1), (1 if inward.y() >= 0 else -1)
+    clear = 2.5 + 6  # half the arrow's width plus a gap
+    if ax >= ay:  # the arrow runs closer to the horizontal edge: the box goes along the vertical edge
+        off = max(CORNER_RING_R + 6, (4 + w) * ay / max(ax, 1e-6) + clear / max(ax, 1e-6))
+        x = corner.x() + 4 if sx > 0 else corner.x() - 4 - w
+        y = corner.y() + off if sy > 0 else corner.y() - off - h
+    else:
+        off = max(CORNER_RING_R + 6, (4 + h) * ax / max(ay, 1e-6) + clear / max(ay, 1e-6))
+        y = corner.y() + 4 if sy > 0 else corner.y() - 4 - h
+        x = corner.x() + off if sx > 0 else corner.x() - off - w
+    return QPointF(x, y)
+
+
+def _draw_box(p: QPainter, box: QRectF, text: str, fg: QColor, bg: QColor) -> None:
+    """Rounded label box with centred ``text`` (the painter's font)."""
     p.setPen(Qt.PenStyle.NoPen)
     p.setBrush(bg)
     p.drawRoundedRect(box, 6, 6)
     p.setPen(fg)
     p.drawText(box, int(Qt.AlignmentFlag.AlignCenter), text)
-    return box
+
+
+def _beside(badge: QRectF, w: float, h: float, side: int) -> QRectF:
+    """A ``w`` x ``h`` box vertically centred on ``badge``, right of it (side 1) or left (-1)."""
+    x = badge.right() + LABEL_GAP if side > 0 else badge.left() - LABEL_GAP - w
+    return QRectF(x, badge.center().y() - h / 2, w, h)
+
+
+def _fits(inner: QRectF, badge: QRectF, box: QRectF | None) -> bool:
+    return inner.contains(badge) and (box is None or inner.contains(box))
+
+
+def _first_fit(candidates: Sequence[QRectF], w: float, h: float, bounds: QRectF,
+               sides: Sequence[int] = (1, -1)) -> tuple[QRectF, QRectF | None]:
+    """First (badge, title box) of the candidate badges (title right, then left of each) that
+    lies inside ``bounds`` (2 px margin); else the first badge clamped on screen with the title
+    clamped right or left of it, on the side with more room."""
+    inner = bounds.adjusted(2, 2, -2, -2)
+    for badge in candidates:
+        for side in sides:
+            box = _beside(badge, w, h, side) if w > 0 else None
+            if _fits(inner, badge, box):
+                return badge, box
+    b = QRectF(candidates[0])
+    b.moveLeft(min(max(inner.left(), b.left()), inner.right() - b.width()))
+    b.moveTop(min(max(inner.top(), b.top()), inner.bottom() - b.height()))
+    if w <= 0:
+        return b, None
+    side = 1 if inner.right() - b.right() >= b.left() - inner.left() else -1
+    box = _beside(b, w, h, side)
+    box.moveLeft(min(max(inner.left(), box.left()), inner.right() - w))
+    box.moveTop(min(max(inner.top(), box.top()), inner.bottom() - h))
+    return b, box
+
+
+def place_point_mark(c: QPointF, w: float, h: float, bounds: QRectF) -> tuple[QRectF, QRectF | None]:
+    """(badge, title box) of a point mark at ``c`` (local px) whose title box is ``w`` x ``h``
+    (w 0 = no title): the badge sits on the ring's upper right with the title to its right; near
+    the right edge both go to the ring's upper left (title left of the badge), near the top
+    edge below the ring. The title never covers its badge or the ring."""
+    right = c.x() + RING_R - 5  # badge overlaps the ring's edge a little, like a counter badge
+    left = c.x() - RING_R + 5 - BADGE
+    above, below = c.y() - RING_R - 15, c.y() + RING_R - 7
+    candidates = [QRectF(right, above, BADGE, BADGE), QRectF(left, above, BADGE, BADGE),
+                  QRectF(right, below, BADGE, BADGE), QRectF(left, below, BADGE, BADGE)]
+    inner = bounds.adjusted(2, 2, -2, -2)
+    for i, badge in enumerate(candidates):
+        side = 1 if i % 2 == 0 else -1  # the title goes away from the ring
+        box = _beside(badge, w, h, side) if w > 0 else None
+        if _fits(inner, badge, box):
+            return badge, box
+    # a title too long for either side: stack it above a badge above the ring (below one below
+    # the ring), clamped horizontally - still clear of the ring and the badge
+    for i, badge in enumerate(candidates):
+        if not inner.contains(badge):
+            continue
+        y = badge.top() - LABEL_GAP - h if i < 2 else badge.bottom() + LABEL_GAP
+        box = QRectF(min(max(inner.left(), badge.left()), inner.right() - w), y, w, h) if w > 0 else None
+        if _fits(inner, badge, box):
+            return badge, box
+    return _first_fit(candidates, w, h, bounds)  # degenerate (screen smaller than the title)
+
+
+def place_rect_mark(r: QRectF, w: float, h: float, bounds: QRectF) -> tuple[QRectF, QRectF | None]:
+    """(badge, title box) of a region mark ``r`` (local px): the badge just above the region's
+    top-left corner with the title to its right (left when the right side has no room); inside
+    the corner when there is no room above the region."""
+    inner = bounds.adjusted(2, 2, -2, -2)
+    x = min(max(inner.left(), r.left() - 1), inner.right() - BADGE)
+    candidates = [QRectF(x, r.top() - BADGE - 2, BADGE, BADGE),
+                  QRectF(min(max(inner.left(), r.left() + 4), inner.right() - BADGE), r.top() + 4, BADGE, BADGE)]
+    return _first_fit(candidates, w, h, bounds)
 
 
 class PickerOverlay(OverlayBase):
@@ -208,8 +330,10 @@ class PickerOverlay(OverlayBase):
             p.setPen(QPen(accent, 2, Qt.PenStyle.DashLine))
             p.setBrush(Qt.BrushStyle.NoBrush)
             p.drawRect(tr_)
-            _label_box(p, QPointF(tr_.left() + 6, tr_.top() + 6), tr("目標視窗", "Target window"),
-                       QColor("#FFFFFF"), QColor(accent.red(), accent.green(), accent.blue(), 210),
+            # opaque, and outside the window when there is room: it never covers (or shows through
+            # to) the window's own text, e.g. a browser tab title in the window's top-left corner
+            _label_box(p, target_badge_anchor(tr_, bounds, _font(12, bold=True)), tr("目標視窗", "Target window"),
+                       QColor("#FFFFFF"), QColor(accent.red(), accent.green(), accent.blue()),
                        _font(12, bold=True), bounds)
         if kind == "window" and self.hover_rect is not None:
             hr = self.local_rect(self.hover_rect)
@@ -258,10 +382,23 @@ class PickerOverlay(OverlayBase):
         cell_w, cell_h = box.width() / max(1, sw), box.height() / max(1, sh)
         cx = box.left() + (ix - sx) * cell_w
         cy = box.top() + (iy - sy) * cell_h
+        cell = QRectF(cx, cy, cell_w, cell_h)
+        accent = _color("accent", "#6B93FF")
+        # the crosshair continues inside the magnifier up to the picked pixel, and that pixel has a
+        # dark and a white outline: both stay visible on a white page and on a dark game
+        p.setPen(QPen(QColor(accent.red(), accent.green(), accent.blue(), 200), 1))
+        mx, my = cell.center().x(), cell.center().y()
+        for a, b in ((QPointF(box.left(), my), QPointF(cell.left() - 2, my)),
+                     (QPointF(cell.right() + 2, my), QPointF(box.right(), my)),
+                     (QPointF(mx, box.top()), QPointF(mx, cell.top() - 2)),
+                     (QPointF(mx, cell.bottom() + 2), QPointF(mx, box.bottom()))):
+            p.drawLine(a, b)
         p.setBrush(Qt.BrushStyle.NoBrush)
+        p.setPen(QPen(QColor(20, 22, 28), 1))
+        p.drawRect(cell.adjusted(-1, -1, 1, 1))
         p.setPen(QPen(QColor(255, 255, 255), 1))
-        p.drawRect(QRectF(cx, cy, cell_w, cell_h))
-        p.setPen(QPen(_color("accent", "#6B93FF"), 2))
+        p.drawRect(cell)
+        p.setPen(QPen(accent, 2))
         p.drawRect(box)
         phys = self.picker.physical_at(self, cur)
         text = f"{phys[0]}, {phys[1]}"
@@ -294,7 +431,7 @@ class PickerOverlay(OverlayBase):
         if cur is not None and box.adjusted(-20, -20, 20, 20).contains(cur):
             box.moveTop(bounds.height() - box.height() - 40)
         p.setPen(QPen(_color("border_strong", "#333A46"), 1))
-        p.setBrush(QColor(28, 32, 39, 235))
+        p.setBrush(PILL_FILL)  # opaque: the crosshair and the target outline stop at its edge
         p.drawRoundedRect(box, 12, 12)
         p.setPen(QColor("#E7E9EE"))
         p.setFont(f1)
@@ -305,53 +442,60 @@ class PickerOverlay(OverlayBase):
 
 
 class MarksOverlay(OverlayBase):
-    """Click-through preview of PreviewMarks on one screen."""
+    """Click-through preview of PreviewMarks on one screen: the badge carries the step number,
+    the box beside it the step title (PreviewMark.label, no number)."""
 
     def __init__(self, geom: ScreenGeom, marks: Sequence[PreviewMark]) -> None:
         super().__init__(geom, interactive=False)
         self.marks = list(marks)
+
+    @staticmethod
+    def title_of(m: PreviewMark) -> str:
+        text = (m.label or "").strip()
+        if not m.ok:
+            text += tr("（不在目標上）", " (not on the target)")
+        return text.strip()
 
     def paintEvent(self, _event) -> None:  # noqa: N802
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
         bounds = QRectF(self.rect())
         ok_c, bad_c = _color("accent", "#6B93FF"), _color("error", "#F87171")
+        font = _font(12, bold=True)
+        p.setFont(font)
+        fm = p.fontMetrics()
         for m in self.marks:
             col = ok_c if m.ok else bad_c
             num = str(m.step_index + 1)
+            text = self.title_of(m)
+            w, h = (fm.horizontalAdvance(text) + 14.0, fm.height() + 8.0) if text else (0.0, 0.0)
             if m.kind in (PreviewKind.POINT, PreviewKind.FALLBACK_POINT) or (m.rect[2] <= 1 and m.rect[3] <= 1):
                 c = self.local_point((m.rect[0], m.rect[1]))
                 style = Qt.PenStyle.DashLine if m.kind is PreviewKind.FALLBACK_POINT else Qt.PenStyle.SolidLine
                 p.setPen(QPen(QColor(255, 255, 255), 4))
                 p.setBrush(Qt.BrushStyle.NoBrush)
-                p.drawEllipse(c, 15, 15)
+                p.drawEllipse(c, RING_R, RING_R)
                 p.setPen(QPen(col, 3, style))
-                p.drawEllipse(c, 15, 15)
+                p.drawEllipse(c, RING_R, RING_R)
                 p.setPen(Qt.PenStyle.NoPen)
                 p.setBrush(col)
                 p.drawEllipse(c, 3, 3)
-                bx = min(c.x() + 10, bounds.right() - 24)
-                by = max(bounds.top() + 2, c.y() - 30)
-                badge = QRectF(bx, by, 22, 22)
-                anchor = QPointF(bx + 26, by)
+                badge, box = place_point_mark(c, w, h, bounds)
             else:
                 r = self.local_rect(m.rect)
                 style = Qt.PenStyle.DashLine if m.kind is PreviewKind.SEARCH_REGION else Qt.PenStyle.SolidLine
                 p.setPen(QPen(col, 2, style))
                 p.setBrush(QColor(col.red(), col.green(), col.blue(), 28))
                 p.drawRect(r)
-                badge = QRectF(r.left() - 1, r.top() - 24, 22, 22)
-                anchor = QPointF(r.left() + 26, r.top() - 24)
+                badge, box = place_rect_mark(r, w, h, bounds)
             p.setPen(Qt.PenStyle.NoPen)
             p.setBrush(col)
             p.drawEllipse(badge)
             p.setPen(QColor("#FFFFFF"))
-            p.setFont(_font(12, bold=True))
+            p.setFont(font)
             p.drawText(badge, int(Qt.AlignmentFlag.AlignCenter), num)
-            text = m.label or num
-            if not m.ok:
-                text += tr("（不在目標上）", " (not on the target)")
-            _label_box(p, anchor, text, QColor("#FFFFFF"), QColor(20, 22, 28, 220), _font(12, bold=True), bounds)
+            if box is not None:
+                _draw_box(p, box, text, QColor("#FFFFFF"), QColor(20, 22, 28, 220))
         p.end()
 
 
@@ -375,7 +519,7 @@ class CountdownWidget(OverlayBase):
         panel = QRectF(0, 0, 360, 240)
         panel.moveCenter(bounds.center())
         p.setPen(QPen(_color("border_strong", "#333A46"), 1))
-        p.setBrush(QColor(28, 32, 39, 232))
+        p.setBrush(PILL_FILL)  # opaque: no text of the window behind shows through the digit or the hint
         p.drawRoundedRect(panel, 18, 18)
         p.setPen(QColor("#FFFFFF"))
         p.setFont(_font(110, bold=True))
@@ -398,11 +542,18 @@ class CountdownWidget(OverlayBase):
         if dist < 1:
             return
         ux, uy = dx / dist, dy / dist
-        # leave the panel along the direction, then draw an arrow of at most 90 px
         t_edge = min(abs((panel.width() / 2) / ux) if ux else 1e9, abs((panel.height() / 2) / uy) if uy else 1e9)
-        a = QPointF(start.x() + ux * (t_edge + 10), start.y() + uy * (t_edge + 10))
-        length = min(90.0, max(30.0, dist - t_edge - 20))
-        b = QPointF(a.x() + ux * length, a.y() + uy * length)
+        if bounds.contains(target):
+            # the corner is on this screen: the arrow ends at the ring around it, so it points AT the
+            # corner (an arrow that stopped mid-screen seemed to point at whatever was there)
+            room = dist - t_edge - 10 - (CORNER_RING_R + 8)
+            length = min(CORNER_ARROW_MAX, max(20.0, room))
+            b = QPointF(target.x() - ux * (CORNER_RING_R + 8), target.y() - uy * (CORNER_RING_R + 8))
+            a = QPointF(b.x() - ux * length, b.y() - uy * length)
+        else:  # on another screen: leave the panel towards it with an arrow of at most 90 px
+            a = QPointF(start.x() + ux * (t_edge + 10), start.y() + uy * (t_edge + 10))
+            length = min(90.0, max(30.0, dist - t_edge - 20))
+            b = QPointF(a.x() + ux * length, a.y() + uy * length)
         col = _color("warning", "#F5B544")
         p.setPen(QPen(col, 5, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
         p.drawLine(a, b)
@@ -414,6 +565,7 @@ class CountdownWidget(OverlayBase):
         if bounds.contains(target):
             p.setBrush(Qt.BrushStyle.NoBrush)
             p.setPen(QPen(col, 4))
-            p.drawEllipse(target, 22, 22)
-            _label_box(p, QPointF(target.x() + 28, target.y() + 10), tr("緊急停止", "Emergency stop"),
-                       QColor("#14181F"), col, _font(12, bold=True), bounds)
+            p.drawEllipse(target, CORNER_RING_R, CORNER_RING_R)
+            text, font = tr("緊急停止", "Emergency stop"), _font(12, bold=True)
+            _label_box(p, corner_label_anchor(target, QPointF(-ux, -uy), text, font), text,
+                       QColor("#14181F"), col, font, bounds)

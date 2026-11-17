@@ -127,7 +127,8 @@ def test_no_profile_banner_and_disabled_buttons_say_why(qtbot: Any, isolated_hom
     for btn in (page._start_btn, page._test_btn):
         assert not btn.isEnabled()
         assert btn.toolTip() == "先建立或選擇設定檔，才能開始兌換。"
-    assert page._run_hint.text() == "先建立或選擇設定檔，才能開始兌換。"
+    # the no-profile banner is the inline explanation: the hint under the buttons does not repeat it
+    assert page._run_hint.text() == "" and not page._run_hint.isVisibleTo(page)
     assert page._stack.currentIndex() == 1  # empty state
     assert page.format_choice() == "auto"
     navigated: list[str] = []
@@ -153,7 +154,7 @@ def test_buttons_disabled_during_run(page: CodesPage) -> None:
     plan = session.build_plan(page.ctx.active_profile(), page.ctx.settings)
     session.start(plan)
     assert not page._start_btn.isEnabled()
-    assert page._start_btn.toolTip() == "正在執行中"
+    assert page._start_btn.toolTip() == "執行中：這次執行的序號暫時不能修改"
     session.stop()
     assert page._start_btn.isEnabled()
 

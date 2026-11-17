@@ -60,6 +60,8 @@ QPushButton, QToolButton[variant] {{
 QPushButton:hover, QToolButton[variant]:hover {{ background: {c['surface_hover']}; }}
 QPushButton:pressed, QToolButton[variant]:pressed {{ background: {c['border_strong']}; }}
 QPushButton:focus, QToolButton[variant]:focus {{ border-color: {c['accent']}; }}
+/* one disabled look for every filled button (secondary, primary, danger): the control fill, the plain border and
+   the disabled text colour - a disabled 開始兌換 looks like a disabled 測試一筆 (UI review U26) */
 QPushButton:disabled, QToolButton[variant]:disabled {{ color: {c['text_disabled']}; border-color: {c['border']}; }}
 QPushButton:checked, QToolButton[variant]:checked {{ background: {c['nav_active']}; border-color: {c['accent']}; }}
 QPushButton[variant="primary"] {{
@@ -69,19 +71,21 @@ QPushButton[variant="primary"] {{
 QPushButton[variant="primary"]:hover {{ background: {c['accent_fill_hover']}; border-color: {c['accent_fill_hover']}; }}
 QPushButton[variant="primary"]:pressed {{ background: {c['accent_fill_pressed']}; }}
 QPushButton[variant="primary"]:focus {{ border-color: {c['text']}; }}
-QPushButton[variant="primary"]:disabled {{ background: {c['surface_inset']}; border-color: {c['border_strong']}; color: {c['text_disabled']}; }}
+QPushButton[variant="primary"]:disabled {{ background: {c['surface_raised']}; border-color: {c['border']}; color: {c['text_disabled']}; }}
 QPushButton[variant="ghost"], QToolButton[variant="ghost"] {{
     background: transparent; border-color: transparent; color: {c['text_secondary']}; padding: 0px 10px;
 }}
 QPushButton[variant="ghost"]:hover, QToolButton[variant="ghost"]:hover {{ background: {c['hover']}; color: {c['text']}; }}
 QPushButton[variant="ghost"]:focus, QToolButton[variant="ghost"]:focus {{ border-color: {c['accent']}; }}
 QPushButton[variant="ghost"]:disabled, QToolButton[variant="ghost"]:disabled {{ color: {c['text_disabled']}; border-color: transparent; }}
+QToolButton[toc="true"]:checked {{ background: {c['nav_active']}; border-color: transparent; color: {c['text']}; }}
+QToolButton[toc="true"]:checked:focus {{ border-color: {c['accent']}; }}
 QPushButton[variant="danger"], QToolButton[variant="danger"] {{
     background: {c['error_soft']}; border-color: {c['error_border']}; color: {c['error_text']}; font-weight: bold;
 }}
 QPushButton[variant="danger"]:hover, QToolButton[variant="danger"]:hover {{ background: {c['error_border']}; }}
 QPushButton[variant="danger"]:focus, QToolButton[variant="danger"]:focus {{ border-color: {c['error_text']}; }}
-QPushButton[variant="danger"]:disabled, QToolButton[variant="danger"]:disabled {{ background: transparent; color: {c['text_disabled']}; border-color: {c['border']}; }}
+QPushButton[variant="danger"]:disabled, QToolButton[variant="danger"]:disabled {{ background: {c['surface_raised']}; color: {c['text_disabled']}; border-color: {c['border']}; }}
 QToolButton[variant="icon"] {{ background: transparent; border-color: transparent; padding: 0px; }}
 QToolButton[variant][iconOnly="true"] {{ padding: 0px; }}
 QToolButton[variant="icon"]:hover {{ background: {c['hover']}; }}
@@ -105,6 +109,10 @@ QFrame[frameRole="segmented"] QPushButton:checked, QFrame#Segmented QPushButton:
     background: {c['seg_active']}; border-color: {c['border_strong']}; color: {c['text']};
 }}
 QFrame[frameRole="segmented"] QPushButton:focus, QFrame#Segmented QPushButton:focus {{ border-color: {c['accent']}; }}
+QFrame[frameRole="segmented"] QPushButton:disabled, QFrame#Segmented QPushButton:disabled {{ color: {c['text_disabled']}; }}
+QFrame[frameRole="segmented"] QPushButton:checked:disabled, QFrame#Segmented QPushButton:checked:disabled {{
+    border-color: {c['border']}; color: {c['text_disabled']};
+}}
 """
 
 
@@ -182,6 +190,9 @@ QHeaderView::section {{
 }}
 QTableCornerButton::section {{ background: transparent; border: none; }}
 QScrollArea {{ background: transparent; border: none; }}
+QScrollArea[frameRole="inset"] {{
+    background: {c['surface_inset']}; border: 1px solid {c['border']}; border-radius: {R_MD}px; padding: 4px;
+}}
 QScrollArea > QWidget#qt_scrollarea_viewport {{ background: transparent; }}
 QScrollBar:vertical {{ background: transparent; width: 10px; margin: 2px 1px; }}
 QScrollBar::handle:vertical {{ background: {c['scrollbar']}; border-radius: 3px; min-height: 28px; margin: 0px 2px; }}
@@ -191,6 +202,7 @@ QScrollBar::handle:horizontal {{ background: {c['scrollbar']}; border-radius: 3p
 QScrollBar::handle:horizontal:hover {{ background: {c['scrollbar_hover']}; }}
 QScrollBar::add-line, QScrollBar::sub-line {{ width: 0px; height: 0px; border: none; background: none; }}
 QScrollBar::add-page, QScrollBar::sub-page {{ background: none; }}
+QAbstractScrollArea::corner {{ background: transparent; border: none; }}
 """
 
 

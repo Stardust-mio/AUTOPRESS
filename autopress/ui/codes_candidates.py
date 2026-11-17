@@ -1,13 +1,16 @@
 # OWNED BY G6
 """Candidate list shared by the PasteDialog and the OcrReviewDialog (private to G6).
 
-* ``CandidateEntry``: one extracted candidate plus the dialog state (checked, 已核對, edited) and
-  the checks against the queue and history of the import target (重複 / 已兌換過 badges).
+* ``CandidateEntry``: one extracted candidate plus the dialog state (checked, reviewed = the
+  「確認無誤」 tick, edited) and the checks against the queue and history of the import target
+  (重複 / 已兌換過 badges).
 * ``CandidateModel`` + delegates: check, code (mono with flagged / look-alike marks, raw text
   next to it when normalisation changed it; editable in the OCR dialog), confidence, source-line
-  crop, badges, 已核對.
-* ``ImportDialogBase``: 格式 combo, target line, summary 「將加入 {a} 筆，略過 {d} 筆重複、{h} 筆已兌換過」,
-  取消 / 加入 buttons, and the public ``candidates()`` / ``code_format()`` of both dialogs.
+  crop, badges, 確認 (a 「確認無誤」 tick per flagged candidate: the same words as the Codes page
+  action that does the same for queued codes, and the 確認 of 需確認).
+* ``ImportDialogBase``: 格式 combo, target line, summary 「將加入 {a} 筆，略過 {d} 筆重複、{h} 筆已兌換過」
+  (a skip part is left out when its count is 0), 取消 / 加入 buttons, and the public
+  ``candidates()`` / ``code_format()`` of both dialogs.
 
 Duplicates and history-skipped candidates cannot be unticked: they stay in ``candidates()`` so
 ``CodeQueue.add_candidates`` counts them (the toast and the page header report the same numbers
@@ -21,7 +24,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from PyQt6.QtCore import QAbstractTableModel, QModelIndex, QRectF, Qt, pyqtSignal
-from PyQt6.QtGui import QPainter, QPixmap
+from PyQt6.QtGui import QFontMetrics, QPainter, QPixmap
 from PyQt6.QtWidgets import (
     QAbstractItemView,
     QDialog,
@@ -52,20 +55,23 @@ from .codes_model import (
     CodeDelegate,
     ConfidenceDelegate,
 )
-from .codes_paint import code_width, paint_badge, paint_check, paint_code
+from .codes_paint import CELL_PAD, paint_badge, paint_check, paint_code
 
 PASTE_COLUMNS: tuple[str, ...] = ("check", "code", "badges")
 OCR_COLUMNS: tuple[str, ...] = ("check", "code", "conf", "crop", "badges", "reviewed")
 _TITLES: dict[str, T] = {"check": T("", ""), "code": T("序號", "Code"), "conf": T("信心", "Confidence"),
-                         "crop": T("原圖", "Image"), "badges": T("標記", "Notes"), "reviewed": T("核對", "Checked")}
+                         "crop": T("原圖", "Image"), "badges": T("標記", "Notes"), "reviewed": T("確認", "Review")}
 _WIDTHS: dict[str, int] = {"check": 40, "conf": 116, "crop": 116, "reviewed": 104}
+REVIEWED_LABEL = T("確認無誤", "Looks right")
+"""Label of the review tick of a flagged candidate (a static action label: the tick shows the
+state, the colour turns from warning to success) - the OCR dialog's hint names it."""
 
 
 @dataclass
 class CandidateEntry:
     cand: CodeCandidate
     checked: bool = True
-    reviewed: bool = False  # 「已核對」 ticked: flagged characters confirmed by the user
+    reviewed: bool = False  # 「確認無誤」 ticked: flagged characters confirmed by the user
     edited: bool = False  # code changed by the user (clears flags like an edit in the table)
     duplicate: bool = False  # same code already queued for the target game
     history_status: CodeStatus | None = None  # latest history status for the target game
@@ -140,8 +146,16 @@ def summary_counts(entries: Sequence[CandidateEntry]) -> tuple[int, int, int, in
 
 
 def summary_text(add: int, dup: int, hist: int, review: int = 0) -> str:
-    text = tr("將加入 {a} 筆，略過 {d} 筆重複、{h} 筆已兌換過",
-              "{a} will be added; {d} duplicate(s) and {h} already redeemed are skipped").format(a=add, d=dup, h=hist)
+    """「將加入 {a} 筆，略過 {d} 筆重複、{h} 筆已兌換過（{r} 筆需要確認）」; a skip part with a count of 0
+    is left out (as in the import toast), and so is the review suffix."""
+    skipped = []
+    if dup:
+        skipped.append(tr("{d} 筆重複", "{d} duplicate(s)").format(d=dup))
+    if hist:
+        skipped.append(tr("{h} 筆已兌換過", "{h} already redeemed").format(h=hist))
+    text = tr("將加入 {a} 筆", "{a} will be added").format(a=add)
+    if skipped:
+        text += tr("，略過 {parts}", "; skipping {parts}").format(parts=tr("、", " and ").join(skipped))
     if review:
         text += tr("（{r} 筆需要確認）", " ({r} need review)").format(r=review)
     return text
@@ -151,7 +165,7 @@ def summary_text(add: int, dup: int, hist: int, review: int = 0) -> str:
 
 
 class CandidateModel(QAbstractTableModel):
-    changed = pyqtSignal()  # checked / 已核對 / code edits
+    changed = pyqtSignal()  # checked / 確認無誤 / code edits
 
     def __init__(self, columns: Sequence[str], parent: Any = None) -> None:
         super().__init__(parent)
@@ -228,8 +242,9 @@ class CandidateModel(QAbstractTableModel):
                 return "—" if conf is None else f"{round(conf * 100)}%"
             if key == "badges" and role == Qt.ItemDataRole.DisplayRole:
                 return " · ".join(text for text, _tone in e.badges())
-            if key == "reviewed" and role == Qt.ItemDataRole.DisplayRole and e.cand.flagged and not e.edited:
-                return tr("已核對", "Checked") if e.reviewed else tr("需核對", "Check")
+            if (key == "reviewed" and role == Qt.ItemDataRole.DisplayRole and e.cand.flagged and not e.edited
+                    and e.checkable):
+                return str(REVIEWED_LABEL)  # ticked or not: ReviewedDelegate colours the state
         if role == Qt.ItemDataRole.DecorationRole and key == "crop":
             return e.crop
         if role == Qt.ItemDataRole.ToolTipRole:
@@ -250,8 +265,8 @@ class CandidateModel(QAbstractTableModel):
         if key == "badges":
             return " · ".join(text for text, _tone in e.badges()) or None
         if key == "reviewed" and e.cand.flagged and not e.edited:
-            return tr("對照原圖確認黃色字元正確後勾選；勾選的序號會直接成為「待兌換」",
-                      "Tick after comparing the yellow characters with the image; ticked codes become Pending")
+            return tr("對照原圖，標示的字元都正確就勾選；勾選的序號會直接成為「待兌換」",
+                      "Tick when the highlighted characters match the image; ticked codes become Pending")
         return None
 
     def setData(self, index: QModelIndex, value: Any, role: int = Qt.ItemDataRole.EditRole) -> bool:
@@ -291,7 +306,7 @@ class CandidateModel(QAbstractTableModel):
 
 
 class CandidateCodeDelegate(CodeDelegate):
-    """Code with marks; the raw source text follows in muted type when normalisation changed it."""
+    """Code with marks (the raw source text is shown in the 標記 column, BadgesDelegate)."""
 
     def paint_content(self, painter: QPainter, rect: QRectF, index: QModelIndex) -> None:
         e: CandidateEntry | None = index.data(ROLE_ITEM)
@@ -299,15 +314,6 @@ class CandidateCodeDelegate(CodeDelegate):
             return
         token = "text" if e.will_add else "text_muted"
         paint_code(painter, rect, e.cand.code, e.flagged, e.cand.lookalikes, token)
-        raw = (e.cand.raw or "").strip()
-        if raw and raw != e.cand.code:
-            x = rect.left() + code_width(e.cand.code) + 12
-            r = QRectF(x, rect.top(), max(0.0, rect.right() - x), rect.height())
-            painter.setFont(theme.font(theme.FS_SMALL))
-            painter.setPen(theme.color("text_muted"))
-            text = painter.fontMetrics().elidedText(tr("原文：{raw}", "source: {raw}").format(raw=raw),
-                                                    Qt.TextElideMode.ElideRight, int(r.width()))
-            painter.drawText(r, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft, text)
 
 
 class CropDelegate(CellDelegate):
@@ -329,6 +335,10 @@ class CropDelegate(CellDelegate):
 
 
 class BadgesDelegate(CellDelegate):
+    """The badges, then the raw source text in muted type when normalisation changed it (here and
+    not after the code: the code column is narrow, so 「原文：ＱＲ５６…」 was cut off next to an
+    empty 標記 cell)."""
+
     def paint_content(self, painter: QPainter, rect: QRectF, index: QModelIndex) -> None:
         e: CandidateEntry | None = index.data(ROLE_ITEM)
         if e is None:
@@ -338,11 +348,20 @@ class BadgesDelegate(CellDelegate):
         for text, tone in e.badges():
             x += paint_badge(painter, x, rect.center().y(), text, tone) + 6
             if x > rect.right():
-                break
+                return
+        raw = (e.cand.raw or "").strip()
+        if raw and raw != e.cand.code:
+            r = QRectF(x, rect.top(), max(0.0, rect.right() - x), rect.height())
+            painter.setFont(theme.font(theme.FS_SMALL))
+            painter.setPen(theme.color("text_muted"))
+            text = painter.fontMetrics().elidedText(tr("原文：{raw}", "source: {raw}").format(raw=raw),
+                                                    Qt.TextElideMode.ElideRight, int(r.width()))
+            painter.drawText(r, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft, text)
 
 
 class ReviewedDelegate(CheckDelegate):
-    """「已核對」 tick for flagged candidates (nothing for the others)."""
+    """「確認無誤」 tick for flagged candidates (nothing for the others): the label stays the same,
+    warning colour until ticked, success colour after."""
 
     def paint_content(self, painter: QPainter, rect: QRectF, index: QModelIndex) -> None:
         state = index.data(Qt.ItemDataRole.CheckStateRole)
@@ -355,6 +374,13 @@ class ReviewedDelegate(CheckDelegate):
         painter.drawText(QRectF(box.right() + 6, rect.top(), rect.right() - box.right() - 6, rect.height()),
                          Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft,
                          str(index.data(Qt.ItemDataRole.DisplayRole) or ""))
+
+
+def reviewed_column_width() -> int:
+    """Width of the 確認 column: cell padding, the 16 px box, the gap and the bold label in the
+    current language (the English label is wider than _WIDTHS["reviewed"])."""
+    label = QFontMetrics(theme.font(theme.FS_SMALL, bold=True)).horizontalAdvance(str(REVIEWED_LABEL))
+    return max(_WIDTHS["reviewed"], 2 * CELL_PAD + 16 + 6 + label + 4)
 
 
 def setup_candidate_view(view: QTableView, model: CandidateModel) -> list[CellDelegate]:
@@ -379,7 +405,7 @@ def setup_candidate_view(view: QTableView, model: CandidateModel) -> list[CellDe
         delegates.append(d)
         if key in _WIDTHS:
             header.setSectionResizeMode(n, QHeaderView.ResizeMode.Fixed)
-            view.setColumnWidth(n, _WIDTHS[key])
+            view.setColumnWidth(n, reviewed_column_width() if key == "reviewed" else _WIDTHS[key])
         else:
             header.setSectionResizeMode(n, QHeaderView.ResizeMode.Stretch)
     view._delegates = delegates  # type: ignore[attr-defined]  # keep the Python objects alive
@@ -491,7 +517,7 @@ class ImportDialogBase(QDialog):
         self._add_btn.setEnabled(add > 0)
 
     def candidates(self) -> list[CodeCandidate]:
-        """Ticked candidates (edits applied; 已核對 / edited ones without flags), plus duplicates
+        """Ticked candidates (edits applied; 確認無誤 / edited ones without flags), plus duplicates
         and history skips so the queue counts them. Valid after exec() returned Accepted."""
         return [e.result() for e in self._model.entries if e.included]
 

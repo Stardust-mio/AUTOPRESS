@@ -1,17 +1,20 @@
 # OWNED BY G7
 """Target-window picker: list of win32.windows.list_windows() (exe icon via
 QFileIconProvider, title, exe name, 「系統管理員」 badge when elevation.input_permission is
-BLOCKED_ELEVATED, 「未知權限」 when UNKNOWN), search, refresh, and 「點選視窗」 (overlays.pick
-"window" crosshair). Windows of models.FORBIDDEN_TARGET_EXES are shown disabled with
-「系統程式，不能當目標」; the profile's ``suggested_exe`` (imports) is listed first. Returns the
-chosen WindowInfo; the caller stores info.to_target() (browser targets keep the title keyword
-it contains; the user may shorten it, but not to empty)."""
+BLOCKED_ELEVATED, 「可能無法輸入」 when UNKNOWN - warning badges in the warning colour), search,
+refresh, and 「點選視窗」 (overlays.pick "window" crosshair). Windows of
+models.FORBIDDEN_TARGET_EXES are shown disabled with 「系統程式，不能當目標」; the profile's
+``suggested_exe`` (imports) is listed first and marked 「建議」 in the program column. When the
+selected window runs as administrator and this user can elevate, the button
+「以系統管理員身分重新啟動」 appears at the bottom left (run_actions.restart_as_admin_flow).
+Returns the chosen WindowInfo; the caller stores info.to_target() (browser targets keep the title
+keyword it contains; the user may shorten it, but not to empty)."""
 
 from __future__ import annotations
 
 import logging
 
-from PyQt6.QtCore import QFileInfo, Qt
+from PyQt6.QtCore import QFileInfo, QSize, Qt
 from PyQt6.QtGui import QIcon, QKeySequence, QShortcut
 from PyQt6.QtWidgets import (
     QDialog,
@@ -27,19 +30,80 @@ from PyQt6.QtWidgets import (
 from ..context import AppContext
 from ..i18n import tr
 from ..models import FORBIDDEN_TARGET_EXES, TargetMatch, WindowInfo
+from . import icons, theme
 from . import widgets as w
 
 log = logging.getLogger(__name__)
 
 ROLE_INDEX = Qt.ItemDataRole.UserRole + 1
+ROW_H = 36  # list row height, set on the items (the QSS item min-height does not reach these rows)
 
 
 def elevated_text() -> str:
-    """SPEC 7.1 'target elevated' text."""
+    """SPEC 7.1 'target elevated' text (the pre-flight list, whose row has that button)."""
     return tr("目標程式以系統管理員權限執行，Windows 會無聲阻擋一般權限程式的模擬輸入。"
-              "請按「以系統管理員身分重新啟動 AutoPress」。",
+              "請按「以系統管理員身分重新啟動」。",
               "The target runs as administrator; Windows silently blocks simulated input from normal "
-              "programs. Click \"Restart AutoPress as administrator\".")
+              "programs. Click \"Restart as administrator\".")
+
+
+def can_elevate() -> bool:
+    """This Windows account can restart AutoPress as administrator (a consent prompt);
+    False when the win32 layer cannot tell."""
+    try:
+        from ..win32 import elevation
+
+        return bool(elevation.can_elevate())
+    except Exception as exc:
+        log.debug("can_elevate unavailable: %s", exc)
+        return False
+
+
+def _restart_label() -> str:
+    from .run_actions import action_label
+
+    return action_label("restart_admin")
+
+
+def _standard_user_text() -> str:
+    from ..runner import messages  # the pre-flight wording for the same case
+
+    return messages.pf_target_elevated_standard_user()
+
+
+def elevated_picker_text(elevate: bool | None = None) -> str:
+    """The picker's text for a window that runs as administrator: names the button at the
+    bottom left of the picker (it appears while such a window is selected); for an account
+    that cannot elevate, the standard-user advice instead (no button)."""
+    if not (can_elevate() if elevate is None else elevate):
+        return _standard_user_text()
+    return tr("目標程式以系統管理員權限執行，Windows 會無聲阻擋一般權限程式的模擬輸入。"
+              f"選取這個視窗後，按左下角的「{_restart_label()}」。",
+              "The target runs as administrator; Windows silently blocks simulated input from normal programs. "
+              f"Select this window, then click \"{_restart_label()}\" at the bottom left.")
+
+
+def elevated_card_text(elevate: bool | None = None) -> str:
+    """The same for the Profiles target card, which has no restart button: points to
+    「選擇視窗…」, whose list offers it."""
+    if not (can_elevate() if elevate is None else elevate):
+        return _standard_user_text()
+    return tr("目標程式以系統管理員權限執行，Windows 會無聲阻擋一般權限程式的模擬輸入。"
+              f"請按「選擇視窗…」，再按「{_restart_label()}」。",
+              "The target runs as administrator; Windows silently blocks simulated input from normal programs. "
+              f"Click \"Choose window…\", then \"{_restart_label()}\".")
+
+
+def unknown_badge() -> str:
+    """Badge for a window whose privileges cannot be read (UNKNOWN): what it means for the user."""
+    return tr("可能無法輸入", "Input may be blocked")
+
+
+def unknown_text() -> str:
+    """Tooltip of :func:`unknown_badge` (the pre-flight wording, SPEC 7.1 'elevation unknown')."""
+    from ..runner import messages
+
+    return messages.pf_elevation_unknown()
 
 
 def forbidden_text(exe: str) -> str:
@@ -66,7 +130,8 @@ def input_permission_of(hwnd: int) -> str:
 
 class WindowPickerDialog(QDialog):
     def __init__(self, ctx: AppContext, current: TargetMatch | None = None, parent: QWidget | None = None,
-                 suggested_exe: str = "") -> None:
+                 suggested_exe: str = "", caption: str = "") -> None:
+        """``caption``: a small line above the title, e.g. the setup wizard's 「設定精靈 1/5」."""
         super().__init__(parent)
         self.ctx = ctx
         self.current = current
@@ -76,14 +141,21 @@ class WindowPickerDialog(QDialog):
         self._selected: WindowInfo | None = None
         self._icons = QFileIconProvider()
         self._icon_cache: dict[str, QIcon] = {}
+        self._can_elevate = can_elevate()
         self.setWindowTitle(tr("選擇目標視窗", "Choose the target window"))
         self.setMinimumSize(720, 480)
 
         lay = QVBoxLayout(self)
         lay.setContentsMargins(20, 16, 20, 16)
         lay.setSpacing(10)
-        lay.addWidget(w.label(tr("選擇要自動輸入序號的遊戲或兌換網頁視窗", "Pick the game or redeem-page window"),
-                              "title"))
+        head = QVBoxLayout()
+        head.setSpacing(2)
+        self.caption = w.label(caption, "caption")
+        self.caption.setVisible(bool(caption))
+        head.addWidget(self.caption)
+        head.addWidget(w.label(tr("選擇要自動輸入序號的遊戲或兌換網頁視窗", "Pick the game or redeem-page window"),
+                               "title"))
+        lay.addLayout(head)
         hint = tr("先開啟遊戲或兌換網頁，再從清單選擇；也可以按「點選視窗」直接在畫面上點它。",
                   "Open the game or redeem page first, then pick it from the list, or click \"Pick on screen\".")
         if self.suggested_exe:
@@ -113,6 +185,7 @@ class WindowPickerDialog(QDialog):
         self.tree.setRootIsDecorated(False)
         self.tree.setUniformRowHeights(True)
         self.tree.setAlternatingRowColors(False)
+        self.tree.setIconSize(QSize(16, 16))
         hdr = self.tree.header()
         hdr.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         hdr.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
@@ -130,6 +203,13 @@ class WindowPickerDialog(QDialog):
         lay.addWidget(self.detail)
 
         btns = QHBoxLayout()
+        # the button elevated_picker_text() points to (U24); shown while such a window is selected
+        self.restart_btn = w.push_button(_restart_label(), "secondary", "shield")
+        self.restart_btn.setToolTip(tr("Windows 會詢問是否允許；重新啟動後再選一次這個視窗。",
+                                       "Windows asks for permission; pick this window again after the restart."))
+        self.restart_btn.clicked.connect(self._restart_as_admin)
+        self.restart_btn.hide()
+        btns.addWidget(self.restart_btn)
         btns.addStretch(1)
         self.cancel_btn = w.push_button(tr("取消", "Cancel"), "secondary")
         self.cancel_btn.clicked.connect(self.reject)
@@ -188,6 +268,7 @@ class WindowPickerDialog(QDialog):
                 continue
             badges = []
             tip = ""
+            warn = False  # a badge that can stop the input: warning colour + icon
             forbidden = is_forbidden_window(info)
             if forbidden:
                 badges.append(tr("系統程式，不能當目標", "System program, cannot be the target"))
@@ -196,24 +277,31 @@ class WindowPickerDialog(QDialog):
                 perm = self._perms.get(info.hwnd, "ok")
                 if perm == "blocked_elevated":
                     badges.append(tr("系統管理員", "Administrator"))
-                    tip = elevated_text()
+                    tip, warn = elevated_picker_text(self._can_elevate), True
                 elif perm == "unknown":
-                    badges.append(tr("未知權限", "Unknown privileges"))
-                    tip = tr("無法讀取目標程式的權限（可能是系統或受保護程式）；若輸入沒有反應，請以系統管理員身分執行 AutoPress。",
-                             "Cannot read the target's privileges (system or protected program). "
-                             "If input has no effect, run AutoPress as administrator.")
+                    badges.append(unknown_badge())
+                    tip, warn = unknown_text(), True
             if info.minimized:
                 badges.append(tr("已最小化", "Minimized"))
-            if self.suggested_exe and info.exe_name.casefold() == self.suggested_exe.casefold():
-                badges.append(tr("建議", "Suggested"))
-            item = QTreeWidgetItem([info.title or tr("（無標題）", "(no title)"), info.exe_name or "?",
-                                    " · ".join(badges)])
+            program = info.exe_name or "?"
+            suggested = bool(self.suggested_exe) and info.exe_name.casefold() == self.suggested_exe.casefold()
+            if suggested:  # a recommendation, kept apart from the warning badges (U40)
+                program = tr(f"{program} · 建議", f"{program} · suggested")
+            item = QTreeWidgetItem([info.title or tr("（無標題）", "(no title)"), program, " · ".join(badges)])
             item.setIcon(0, self._icon(info.exe_path))
             item.setData(0, ROLE_INDEX, n)
-            item.setToolTip(0, info.title)
+            item.setSizeHint(0, QSize(0, ROW_H))  # uniform rows: the first row sets every row's height
+            title_tip = info.title + (tr(f"\n視窗類別：{info.class_name}", f"\nWindow class: {info.class_name}")
+                                      if info.class_name else "")
+            item.setToolTip(0, f"{title_tip}\n{tip}" if tip else title_tip)
             if tip:
-                for col in range(3):
+                for col in (1, 2):
                     item.setToolTip(col, tip)
+            if suggested:
+                item.setForeground(1, theme.color("accent_text"))
+            if warn:
+                item.setForeground(2, theme.color("warning_text"))
+                item.setIcon(2, icons.icon("alert", "warning", 16))
             if forbidden:
                 item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEnabled & ~Qt.ItemFlag.ItemIsSelectable)
             self.tree.addTopLevelItem(item)
@@ -248,15 +336,17 @@ class WindowPickerDialog(QDialog):
             info = None
         self._selected = info
         self.ok_btn.setEnabled(info is not None)
+        elevated = info is not None and self._perms.get(info.hwnd) == "blocked_elevated"
+        self.restart_btn.setVisible(elevated and self._can_elevate)
         if info is None:
             self.detail.setText("")
             return
         cw, ch = info.client[2], info.client[3]
+        # the window class is a developer detail: it is in the title cell's tooltip (U30)
         lines = [tr(f"程式：{info.exe_path or info.exe_name}", f"Program: {info.exe_path or info.exe_name}"),
-                 tr(f"視窗類別：{info.class_name or '—'} · 內容區大小：{cw} × {ch}",
-                    f"Window class: {info.class_name or '-'} · client size: {cw} × {ch}")]
-        if self._perms.get(info.hwnd) == "blocked_elevated":
-            lines.append(elevated_text())
+                 tr(f"內容區大小：{cw} × {ch}", f"Client area: {cw} × {ch}")]
+        if elevated:
+            lines.append(elevated_picker_text(self._can_elevate))
         self.detail.setText("\n".join(lines))
 
     # -- actions --------------------------------------------------------------------------
@@ -273,6 +363,12 @@ class WindowPickerDialog(QDialog):
     def _accept_selected(self) -> None:
         if self._selected is not None:
             self.accept()
+
+    def _restart_as_admin(self) -> None:
+        """「以系統管理員身分重新啟動」: the same confirmation and restart as the pre-flight button."""
+        from . import run_actions
+
+        run_actions.restart_as_admin_flow(self, self.ctx)
 
     def _pick_on_screen(self) -> None:
         from . import overlays
@@ -321,9 +417,9 @@ class WindowPickerDialog(QDialog):
 
 
 def pick_target_window(ctx: AppContext, current: TargetMatch | None = None,
-                       parent: QWidget | None = None, suggested_exe: str = "") -> WindowInfo | None:
-    """Modal convenience wrapper; None when cancelled."""
-    dlg = WindowPickerDialog(ctx, current, parent, suggested_exe=suggested_exe)
+                       parent: QWidget | None = None, suggested_exe: str = "", caption: str = "") -> WindowInfo | None:
+    """Modal convenience wrapper; None when cancelled. ``caption``: see WindowPickerDialog."""
+    dlg = WindowPickerDialog(ctx, current, parent, suggested_exe=suggested_exe, caption=caption)
     try:
         if dlg.exec() == QDialog.DialogCode.Accepted:
             return dlg.selected()
@@ -332,6 +428,7 @@ def pick_target_window(ctx: AppContext, current: TargetMatch | None = None,
         dlg.deleteLater()
 
 
-__all__ = ["WindowPickerDialog", "elevated_text", "forbidden_text", "input_permission_of", "is_forbidden_window",
-           "pick_target_window"]
+__all__ = ["WindowPickerDialog", "can_elevate", "elevated_card_text", "elevated_picker_text", "elevated_text",
+           "forbidden_text", "input_permission_of", "is_forbidden_window", "pick_target_window", "unknown_badge",
+           "unknown_text"]
 

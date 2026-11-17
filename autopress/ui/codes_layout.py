@@ -142,7 +142,8 @@ class CodesLayoutMixin:
         self._profile_combo.setAccessibleName(tr("使用中的設定檔", "Active profile"))
         self._profile_combo.activated.connect(self._on_profile_activated)
         right.addWidget(self._profile_combo)
-        self._test_btn = widgets.push_button(tr("試跑 1 筆", "Test 1 code"), "secondary", "flask")
+        # same label as the Run page, the wizard and the messages that say 「測試一筆」
+        self._test_btn = widgets.push_button(tr("測試一筆", "Test one"), "secondary", "flask")
         self._test_btn.clicked.connect(lambda: self.start_run(test_one=True))
         right.addWidget(self._test_btn)
         self._start_btn = widgets.push_button(tr("開始兌換", "Start"), "primary", "play")
@@ -343,14 +344,17 @@ class CodesLayoutMixin:
 
     def _build_empty_state(self) -> QWidget:
         actions = []
-        for text, icon_name, variant, slot in (
-            (tr("貼上文字", "Paste text"), "paste", "primary", self.paste_text),
-            (tr("開啟檔案", "Open file"), "file", "secondary", self.open_file_dialog),
-            (tr("框選螢幕辨識", "Read a screen region"), "snip", "secondary", self.snip_screen),
-        ):
-            b = widgets.push_button(text, variant, icon_name)
+        self._empty_actions: dict[str, QWidget] = {}
+        for key, icon_name, variant, slot in (("paste", "paste", "primary", self.paste_text),
+                                              ("file", "file", "secondary", self.open_file_dialog),
+                                              ("snip", "snip", "secondary", self.snip_screen)):
+            # the same labels (and tooltips) as the import toolbar above
+            toolbar = self._import_buttons[key]
+            b = widgets.push_button(toolbar.text(), variant, icon_name)
+            b.setToolTip(toolbar.toolTip())
             b.clicked.connect(lambda _c=False, s=slot: s())
             actions.append(b)
+            self._empty_actions[key] = b
         hint = tr("貼上一段文字、開啟 .txt／.csv，或框選畫面上的序號，AutoPress 會自動找出序號並去除重複。",
                   "Paste some text, open a .txt / .csv file or select codes on the screen; AutoPress finds the codes "
                   "and removes duplicates.")
@@ -384,7 +388,10 @@ class CodesLayoutMixin:
     def _build_bulk_bar(self) -> QHBoxLayout:
         bar = QHBoxLayout()
         bar.setSpacing(theme.SP[1])
-        self._sel_label = widgets.label("", "secondary")
+        # "已選取 {n} 筆" or the hint to select rows; elides instead of widening the page (English,
+        # 1100 px minimum window)
+        self._sel_label = widgets.ElidedLabel("")
+        self._sel_label.setProperty("role", "secondary")
         bar.addWidget(self._sel_label)
         bar.addSpacing(theme.SP[2])
         self._btn_remove = widgets.push_button(tr("移除", "Remove"), "ghost", "trash")
@@ -394,7 +401,8 @@ class CodesLayoutMixin:
                                      "Mark as redeemed and record it in the history (later imports skip it)"))
         self._btn_mark.clicked.connect(self.mark_redeemed)
         self._btn_confirm = widgets.push_button(tr("確認無誤", "Looks right"), "ghost", "eye")
-        self._btn_confirm.setToolTip(tr("已核對「需確認」的序號，改為待兌換", "The codes needing review are correct: make them pending"))
+        self._btn_confirm.setToolTip(tr("選取的「需確認」序號都正確：改為待兌換",
+                                        "The selected codes needing review are correct: make them pending"))
         self._btn_confirm.clicked.connect(self.confirm_ok)
         self._btn_skip = widgets.push_button(tr("略過", "Skip"), "ghost", "skip")
         self._btn_skip.clicked.connect(self.toggle_skip)

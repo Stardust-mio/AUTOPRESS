@@ -3,7 +3,7 @@
   "id": "template-web-generic",
   "name": "網頁兌換（通用）",
   "game": "",
-  "description": "適用大多數官方兌換網頁：點輸入框、輸入序號、按「兌換」，再讀取結果訊息。建立後請選擇瀏覽器視窗（標題要含「兌換」之類的關鍵字），並在「遊戲」欄填上遊戲名稱。",
+  "description": "適用大多數官方兌換網頁：點輸入框、輸入序號、按「兌換」，再讀取結果。建立後請選擇瀏覽器視窗（標題要含「兌換」等關鍵字），並在「遊戲」欄填上遊戲名稱。",
   "author": "AutoPress",
   "target": {
     "exe": "",
@@ -38,7 +38,7 @@
       },
       "enabled": true,
       "label": "確認兌換頁面已開啟",
-      "label_en": "Check that the redeem page is open",
+      "label_en": "Check redeem page",
       "id": "tpl-web-1"
     },
     {
@@ -51,7 +51,7 @@
       },
       "enabled": true,
       "label": "點一下序號輸入框",
-      "label_en": "Click the code input box",
+      "label_en": "Click the code box",
       "id": "tpl-web-2"
     },
     {
@@ -83,7 +83,7 @@
       },
       "enabled": true,
       "label": "按下「兌換」按鈕",
-      "label_en": "Press the Redeem button",
+      "label_en": "Press Redeem",
       "id": "tpl-web-4"
     },
     {
@@ -97,8 +97,8 @@
         "only_new_text": true
       },
       "enabled": true,
-      "label": "拉出結果訊息出現的範圍",
-      "label_en": "Drag over the area where the result message appears",
+      "label": "框出結果訊息的範圍",
+      "label_en": "Drag over the result",
       "id": "tpl-web-5"
     },
     {
@@ -113,8 +113,8 @@
         "after_ms": 300
       },
       "enabled": true,
-      "label": "關閉結果視窗（沒有就略過）",
-      "label_en": "Close the result popup (skipped if there is none)",
+      "label": "關閉結果（若有）",
+      "label_en": "Close result (if any)",
       "id": "tpl-web-6"
     }
   ],
@@ -122,8 +122,8 @@
     "key": "web_generic",
     "title_zh": "網頁兌換（通用）",
     "title_en": "Web redeem page (generic)",
-    "description_zh": "適用大多數官方兌換網頁：點輸入框、輸入序號、按「兌換」，再讀取結果訊息。建立後請選擇瀏覽器視窗（標題要含「兌換」之類的關鍵字），並在「遊戲」欄填上遊戲名稱。",
-    "description_en": "For most official redeem web pages: click the input box, type the code, press Redeem and read the result message. After creating it, pick the browser window (its title needs a keyword such as \"Redeem\") and enter the game name.",
+    "description_zh": "適用大多數官方兌換網頁：點輸入框、輸入序號、按「兌換」，再讀取結果。建立後請選擇瀏覽器視窗（標題要含「兌換」等關鍵字），並在「遊戲」欄填上遊戲名稱。",
+    "description_en": "For most official redeem web pages: click the input box, type the code, press Redeem and read the result. After creating it, pick the browser window (its title needs a keyword such as \"Redeem\") and enter the game name.",
     "order": 10
   },
   "created_at": "2026-11-17T00:00:00+08:00",
