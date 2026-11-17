@@ -10,6 +10,10 @@ Safety invariants (SPEC section 2.7):
   The module tracks what it holds; release_all_modifiers() also releases those.
 * Interrupted typing restores the clipboard snapshot (CLIPBOARD mode) and the target's IME
   state (VK mode) in ``finally`` as well (T28).
+* UNICODE characters never overtake our own earlier keys / clicks: into a window with an IME
+  they are typed only TEXT_AFTER_KEYS_SETTLE_S after the last key or mouse-button event (in a Qt
+  window the IME commit of a KEYEVENTF_UNICODE character arrived before keys sent just before it;
+  measured 2026-11-17).
 * SendInput returning fewer events than sent (UAC prompt, locked screen, secure desktop)
   raises InputBlocked (T33).
 * Tick comparisons are wrap-safe: GetTickCount / GetLastInputInfo wrap after 49.7 days, so
@@ -78,6 +82,7 @@ from ._events import (
     injected_presses,
     last_injection_tick,
     reset_user_input_baseline,
+    seconds_since_key_or_button,
     user_active_since_last_injection,
 )
 from .keys import parse_combo
@@ -96,6 +101,15 @@ IME_SETTLE_S = 0.05  # after closing the target's IME, before the first key (int
 IME_RESTORE_DELAY_S = 0.15  # before reopening it: let the target process the queued keys first
 PASTE_MIN_DELAY_S = 0.05  # Ctrl+V -> clipboard restore never sooner (0 ms pasted the old content)
 DOUBLE_CLICK_MIN_HOLD_MS = 20  # an atomic 4-event double click is ignored by Qt; 20 ms holds worked
+TEXT_AFTER_KEYS_SETTLE_S = 0.2
+"""UNICODE typing into a window that has an IME starts at least this long after our last key /
+mouse-button event (interruptible wait). Measured 2026-11-17 on the zh-TW Bopomofo IME: in a Qt
+window the IME commit of a KEYEVENTF_UNICODE character reached the widget before ordinary keys sent
+just before it - characters typed right after clear_field's Ctrl+A + Backspace overtook them 30/30
+times and the clear deleted the first characters of the code. Those keys reached the widget 2-27 ms
+after SendInput (104 ms right after a click); with a 20 ms gap 1/30 still overtook, with 50 / 100 ms
+0/30. A native EDIT control kept the order without a gap (20/20). Clicks count too: a click that
+moves the focus must land before the text."""
 MONITOR_CACHE_S = 2.0
 
 _monitor_cache: list[Any] = [0.0, []]  # [monotonic time, monitor rects]
@@ -398,8 +412,24 @@ def _vk_plan(ch: str, layout: Any, caps: bool) -> list[int]:
     return ([api.VK_LSHIFT] if need_shift else []) + [vk]
 
 
+def _has_ime_window(hwnd: int) -> bool:
+    """True when the thread of ``hwnd`` has a default IME window (characters may go through the IME)."""
+    return bool(hwnd) and bool(api.hwnd_int(api.ImmGetDefaultIMEWnd(int(hwnd))))
+
+
+def _settle_before_text(guard: InjectGuard, sleep: Sleep) -> None:
+    """Wait until TEXT_AFTER_KEYS_SETTLE_S has passed since our last key / mouse-button event when the
+    target window has an IME - otherwise its first characters may arrive before those keys (the
+    constant's docstring has the measurement)."""
+    since = seconds_since_key_or_button()
+    if since is None or since >= TEXT_AFTER_KEYS_SETTLE_S or not _has_ime_window(guard.hwnd):
+        return
+    sleep(TEXT_AFTER_KEYS_SETTLE_S - since)
+
+
 def _type_unicode(text: str, guard: InjectGuard, key_delay_ms: int, hold_ms: int, sleep: Sleep) -> None:
     chars = list(text)
+    _settle_before_text(guard, sleep)
     for i, ch in enumerate(chars):
         units = _utf16_units(ch)
         guard.check(f"char[{i}]")
@@ -468,7 +498,9 @@ def type_text(text: str, guard: InjectGuard, mode: TypingMode = TypingMode.UNICO
               key_delay_ms: int = 15, hold_ms: int = 0, close_ime: bool = True,
               restore_clipboard_ms: int = 300, sleep: Sleep = time.sleep) -> None:
     """Type ``text`` into the focused control of the guarded window.
-    UNICODE: KEYEVENTF_UNICODE per UTF-16 unit, one atomic SendInput per character.
+    UNICODE: KEYEVENTF_UNICODE per UTF-16 unit, one atomic SendInput per character; when the
+    window has an IME, the first character waits until TEXT_AFTER_KEYS_SETTLE_S has passed since
+    our last key / mouse-button event (``sleep``), so it cannot overtake them.
     CLIPBOARD: snapshot the clipboard (all formats), set text (privacy formats), Ctrl+V, wait
     ``restore_clipboard_ms`` (>= 50; 0 ms pastes the old content), restore the snapshot.
     VK: VkKeyScanExW + scan codes with Shift and CapsLock compensation; when ``close_ime`` the

@@ -5,7 +5,10 @@ autopress.win32; the public names are re-exported by win32.input.
 
 Every injected event carries dwExtraInfo = EXTRA_TAG. ``_send`` raises InputBlocked when SendInput
 inserts fewer events than requested; keys / buttons a partially inserted batch left down are
-recorded, so release_all_modifiers() can let them go. State is shared by all threads (lock).
+recorded, so release_all_modifiers() can let them go. ``_send`` also notes when it last inserted an
+ordinary key or a mouse-button event (not a KEYEVENTF_UNICODE character, not a bare move): UNICODE
+typing waits after those for targets with an IME (input.TEXT_AFTER_KEYS_SETTLE_S). State is shared
+by all threads (lock).
 """
 
 from __future__ import annotations
@@ -13,6 +16,7 @@ from __future__ import annotations
 import ctypes
 import logging
 import threading
+import time
 from collections.abc import Callable, Iterable, Sequence
 from typing import Any
 
@@ -33,6 +37,7 @@ _baseline: int | None = None  # reset_user_input_baseline()
 _held_keys: dict[int, None] = {}  # VKs we pressed and have not released (insertion order)
 _held_buttons: dict[MouseButton, None] = {}
 _presses = 0  # key-down / button-down events inserted so far (moves and releases not counted)
+_last_key_or_button: float | None = None  # time.monotonic() of the last inserted ordinary key / mouse-button event
 _BUTTONS: dict[MouseButton, tuple[int, int, int]] = {  # down flag, up flag, VK
     MouseButton.LEFT: (api.MOUSEEVENTF_LEFTDOWN, api.MOUSEEVENTF_LEFTUP, api.VK_LBUTTON),
     MouseButton.RIGHT: (api.MOUSEEVENTF_RIGHTDOWN, api.MOUSEEVENTF_RIGHTUP, api.VK_RBUTTON),
@@ -106,6 +111,22 @@ def held_by_us() -> list[int]:
     not released yet - normally empty; diagnostics and tests."""
     with _lock:
         return [_BUTTONS[b][2] for b in _held_buttons] + list(_held_keys)
+
+
+def _is_key_or_button(ev: api.INPUT) -> bool:
+    """An ordinary key event (not KEYEVENTF_UNICODE) or a mouse event with a button flag."""
+    if ev.type == api.INPUT_KEYBOARD:
+        return not ev.ki.dwFlags & api.KEYEVENTF_UNICODE
+    if ev.type == api.INPUT_MOUSE:
+        return any(ev.mi.dwFlags & (down | up) for down, up, _vk in _BUTTONS.values())
+    return False
+
+
+def seconds_since_key_or_button() -> float | None:
+    """Seconds since this process last inserted an ordinary key or mouse-button event (None if never)."""
+    with _lock:
+        last = _last_key_or_button
+    return None if last is None else max(0.0, time.monotonic() - last)
 
 
 # ================================================================================ events
@@ -186,17 +207,21 @@ def _send(events: Sequence[api.INPUT], what: str = "") -> None:
     n = len(events)
     if n == 0:
         return
-    global _presses
+    global _presses, _last_key_or_button
     arr = (api.INPUT * n)(*events)
     sent = int(api.SendInput(n, arr, ctypes.sizeof(api.INPUT)))
     err = ctypes.get_last_error() if sent != n else 0
     _note_injection()
-    pressed = _count_presses(list(events)[:max(0, sent)])
+    inserted = list(events)[:max(0, sent)]
+    pressed = _count_presses(inserted)
     if pressed:
         with _lock:
             _presses += pressed
+    if any(_is_key_or_button(ev) for ev in inserted):
+        with _lock:
+            _last_key_or_button = time.monotonic()
     if sent != n:
-        _track_leftovers(list(events)[:max(0, sent)])
+        _track_leftovers(inserted)
         log.warning("SendInput inserted %d of %d events (%s, error %s)", sent, n, what, err)
         raise InputBlocked(what=what, sent=sent, requested=n, error=err)
 

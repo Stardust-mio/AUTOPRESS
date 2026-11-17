@@ -15,7 +15,7 @@ from autopress.models import ClearMethod, MouseButton, TypingMode
 from autopress.win32 import _events as ev
 from autopress.win32 import api
 from autopress.win32 import input as inp
-from tests.win32_helpers import RecordingGuard, SendRecorder
+from tests.win32_helpers import RecordingGuard, SendRecorder, decode
 
 VK_A, VK_B, VK_V = 0x41, 0x42, 0x56
 
@@ -35,6 +35,7 @@ def rec(monkeypatch: pytest.MonkeyPatch) -> SendRecorder:
     monkeypatch.setattr(api, "SendInput", r)
     monkeypatch.setattr(ev, "_last_tick", None)
     monkeypatch.setattr(ev, "_baseline", None)
+    monkeypatch.setattr(ev, "_last_key_or_button", None)
     monkeypatch.setattr(api, "tick_count", lambda: 1000)
     inp._held_keys.clear()
     inp._held_buttons.clear()
@@ -157,6 +158,109 @@ def test_guard_runs_before_every_character(rec: SendRecorder) -> None:
     with pytest.raises(inp.ForegroundLost):
         inp.type_text("ABCD", guard, TypingMode.UNICODE, key_delay_ms=0)
     assert len(rec.batches) == 2  # two characters typed, the third refused before sending
+
+
+# ----------------------------------------------------------------------------- UNICODE text after keys (IME)
+
+
+class QtImeField:
+    """SendInput stand-in modelling the measured Qt window with an IME (2026-11-17): the IME commit of a
+    KEYEVENTF_UNICODE character is applied when it is sent, ordinary keys reach the field ``lag``
+    seconds later. ``text()`` replays Ctrl+A, Backspace and characters in arrival order."""
+
+    def __init__(self, clock: list[float], lag: float = 0.05) -> None:
+        self.clock, self.lag = clock, lag
+        self.arrivals: list[tuple[float, int, tuple]] = []
+
+    def __call__(self, n: int, arr: Any, size: int) -> int:
+        for i in range(n):
+            e = decode(arr[i])
+            delay = 0.0 if e[0] == "key" and e[3] & api.KEYEVENTF_UNICODE else self.lag
+            self.arrivals.append((self.clock[0] + delay, len(self.arrivals), e))
+        return n
+
+    def text(self, start: str) -> str:
+        text, selected, ctrl = start, False, False
+        for _t, _n, (kind, vk, scan, flags) in sorted(self.arrivals):
+            down = kind == "key" and not flags & api.KEYEVENTF_KEYUP
+            if kind != "key":
+                continue
+            if flags & api.KEYEVENTF_UNICODE:
+                if down:
+                    text, selected = ("" if selected else text) + chr(scan), False
+            elif vk == api.VK_LCONTROL:
+                ctrl = down
+            elif vk == VK_A and down and ctrl:
+                selected = True
+            elif vk == api.VK_BACK and down:
+                text, selected = ("" if selected else text[:-1]), False
+        return text
+
+
+def test_unicode_text_after_the_clear_keeps_its_first_characters_on_a_qt_ime_target(
+        monkeypatch: pytest.MonkeyPatch) -> None:
+    """Regression (e2e 2026-11-17): typed 'A-1111' for AAAA-1111 - the clear's Ctrl+A + Backspace
+    arrived after the first characters and deleted them."""
+    clock = [100.0]
+    monkeypatch.setattr(time, "monotonic", lambda: clock[0])
+    monkeypatch.setattr(api, "ImmGetDefaultIMEWnd", lambda h: 0x777 if int(h or 0) == 0x1234 else 0)
+
+    def sleep(seconds: float) -> None:
+        clock[0] += seconds
+
+    results = []
+    for settle in (0.0, inp.TEXT_AFTER_KEYS_SETTLE_S):
+        monkeypatch.setattr(inp, "TEXT_AFTER_KEYS_SETTLE_S", settle)
+        field = QtImeField(clock)
+        monkeypatch.setattr(api, "SendInput", field)
+        guard = RecordingGuard(hwnd=0x1234)
+        inp.clear_field(guard, sleep=sleep)
+        inp.type_text("AAAA-1111", guard, TypingMode.UNICODE, key_delay_ms=15, sleep=sleep)
+        clock[0] += 1.0
+        results.append(field.text("OLD-CODE"))
+    assert results[0] != "AAAA-1111"  # the model reproduces the bug without the wait
+    assert results[1] == "AAAA-1111"
+
+
+def test_unicode_text_waits_only_after_a_recent_key_or_click_on_an_ime_target(
+        rec: SendRecorder, monkeypatch: pytest.MonkeyPatch) -> None:
+    clock = [100.0]
+    monkeypatch.setattr(time, "monotonic", lambda: clock[0])
+    monkeypatch.setattr(api, "ImmGetDefaultIMEWnd", lambda h: 0x777 if int(h or 0) == 0x1234 else 0)
+    guard, no_ime = RecordingGuard(hwnd=0x1234), RecordingGuard(hwnd=0x999)
+    slept: list[float] = []
+    inp.type_text("ab", guard, TypingMode.UNICODE, key_delay_ms=0, sleep=slept.append)  # nothing sent before
+    inp.type_text("cd", guard, TypingMode.UNICODE, key_delay_ms=0, sleep=slept.append)  # characters do not count
+    assert slept == []
+    inp.press_keys([api.VK_BACK], guard)
+    clock[0] += 0.05
+    n = len(rec.batches)
+    inp.type_text("ef", guard, TypingMode.UNICODE, key_delay_ms=0, sleep=slept.append)
+    assert slept == [pytest.approx(inp.TEXT_AFTER_KEYS_SETTLE_S - 0.05)]
+    assert len(rec.batches) == n + 2  # the wait happened, then both characters
+    slept.clear()
+    inp.click(10, 10, guard, settle_ms=0, hold_ms=0)  # a click counts as well
+    inp.type_text("gh", no_ime, TypingMode.UNICODE, key_delay_ms=0, sleep=slept.append)  # no IME: no wait
+    assert slept == []
+    inp.type_text("ij", guard, TypingMode.UNICODE, key_delay_ms=0, sleep=slept.append)
+    assert slept == [pytest.approx(inp.TEXT_AFTER_KEYS_SETTLE_S)]
+    slept.clear()
+    clock[0] += inp.TEXT_AFTER_KEYS_SETTLE_S
+    inp.type_text("kl", guard, TypingMode.UNICODE, key_delay_ms=0, sleep=slept.append)  # already long enough
+    assert slept == []
+
+
+def test_only_ordinary_keys_and_mouse_buttons_count_as_keys_before_text(rec: SendRecorder) -> None:
+    assert ev._is_key_or_button(ev._vk_event(api.VK_BACK, False))
+    assert ev._is_key_or_button(ev._vk_event(api.VK_LCONTROL, True))
+    assert ev._is_key_or_button(ev._mouse(0, 0, api.MOUSEEVENTF_LEFTUP))
+    assert not ev._is_key_or_button(ev._kbd(0, ord("a"), api.KEYEVENTF_UNICODE))
+    assert not ev._is_key_or_button(ev._mouse(0, 0, api.MOUSEEVENTF_MOVE))  # bring_to_foreground's zero move
+    assert ev.seconds_since_key_or_button() is None
+    inp.type_text("x", RecordingGuard(), TypingMode.UNICODE, key_delay_ms=0)
+    assert ev.seconds_since_key_or_button() is None
+    inp.press_keys([api.VK_RETURN], RecordingGuard())
+    assert ev.seconds_since_key_or_button() is not None
 
 
 def test_vk_typing_uses_shift_only_for_upper_case(rec: SendRecorder, monkeypatch: pytest.MonkeyPatch) -> None:

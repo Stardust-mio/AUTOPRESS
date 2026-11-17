@@ -47,6 +47,19 @@ def key_down(vk: int) -> bool:
     return bool(api.GetAsyncKeyState(vk) & 0x8000)
 
 
+def button_released(vk: int, timeout_s: float = 0.5) -> bool:
+    """True once GetAsyncKeyState shows the mouse button ``vk`` up (within ``timeout_s``). SendInput
+    returns before Windows has processed injected MOUSE events: right after a button-up was inserted
+    the button still read "down" in 17 of 40 measurements and "up" in all 40 within 0.75 ms
+    (keyboard keys read "up" at once, 40 of 40; 2026-11-17). A stuck button never reads up."""
+    deadline = time.monotonic() + timeout_s
+    while key_down(vk):
+        if time.monotonic() > deadline:
+            return False
+        time.sleep(0.001)
+    return True
+
+
 def caps_on() -> bool:
     return bool(api.GetKeyState(api.VK_CAPITAL) & 1)
 
@@ -326,8 +339,8 @@ def test_keys_and_buttons_are_released_when_the_hold_sleep_raises(target: Target
     time.sleep(0.6)
     with pytest.raises(Boom):
         inp.click(*target.info["blank_point"], guard, settle_ms=0, hold_ms=200, sleep=boom)
-    assert not key_down(api.VK_LBUTTON)
-    assert inp.held_by_us() == []
+    assert inp.held_by_us() == []  # the button-up was inserted before Boom propagated
+    assert button_released(api.VK_LBUTTON)
 
 
 def test_clipboard_restored_after_a_stop_during_the_restore_delay(target: TargetApp) -> None:
