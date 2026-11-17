@@ -128,13 +128,18 @@ attempt's history record in place.
 ### 2.3 Blocking waits
 Every wait in the runner (step delays, key delays inside `win32.input` via the `sleep=` argument, polling loops of
 click_text / wait_text / ocr_check, interval between codes, cool-down, pause) goes through `RunControl.sleep()`:
-slices of at most 50 ms, each slice calls `checkpoint()` (stop -> StopRequested) and `tick()` (failsafe corner and
-physical-input checks -> FailsafeTriggered / UserActivity). OCR inference (0.2-1.5 s for regions and full-HD
+slices of at most 50 ms, each slice calls `checkpoint()` (stop -> StopRequested) and `tick()` (failsafe corner ->
+FailsafeTriggered). Physical input is checked ONLY by `InjectGuard.check()` right before every injection (integration,
+gate G-07): input during a wait trips at the next keystroke / click, before anything is sent, so a result read after
+submitting is never aborted and F8 during a wait is the soft pause of 2.6. OCR inference (0.2-1.5 s for regions and full-HD
 clients, up to 4.5 s for a live 4K desktop; ocr.md 3.4) is the only non-interruptible wait; the runner checks right
 after it. `wait_while_paused()` blocks on a condition variable and runs no input checks (a paused run never trips).
 
 ### 2.4 Run lifecycle ("開始兌換", RunFlow G7 + RunSession G4)
-1. Run page or Codes page -> `RunFlow.begin(profile, selection)` (the RunFlow is created lazily on first use);
+1. Run page or Codes page -> `RunFlow.begin(profile, selection)` (the RunFlow is created lazily on first use; each
+   page may own one, but only ONE is active: `begin` registers it in `ctx.extras["g7.active_run_flow"]` and refuses
+   while another flow or the session is active, and `resume` / `stop` / the Run page's buttons always act on the
+   active flow - integration, gate G-05);
    `plan = session.build_plan(...)` (only codes of `profile.game_key()`; history-done codes -> SKIPPED, daily cap
    applied); `report = session.preflight(plan)`.
 2. Preflight sheet (parented to the main window): errors block (with action buttons), warnings need a click, info is
@@ -167,7 +172,10 @@ after it. `wait_while_paused()` blocks on a condition variable and runs no input
 submit_index = profile.first_submit_index(); start_size = client size of the target when the run starts
 for item in plan.items (queue order):
     honour soft pause (state PAUSED until resume); checkpoint()
-    target alive (WindowInfo pid/exe/class)? else re-find with profile.target; none -> pause TARGET_LOST
+    target alive (WindowInfo pid/exe/class)? else re-find with profile.target, using only RESOLVED windows whose
+        program is not in FORBIDDEN_TARGET_EXES and not AutoPress; none -> pause TARGET_LOST; once the run had a
+        window, a DIFFERENT matching window is used only after the user confirmed it (TARGET_LOST pause naming the
+        candidate; several candidates -> pause until one is left) - gate G-03
     alive but profile.target.matches(exe, CURRENT title, class) is False (tab changed) -> pause TITLE_CHANGED
     bring_to_foreground(target) (restores a minimized window, then waits until two client_rect reads 100 ms apart
         agree, max 5 s - exclusive-fullscreen games switch display mode) else pause FOCUS_LOST
@@ -177,8 +185,12 @@ for item in plan.items (queue order):
     for each enabled step (StepType.UNKNOWN skipped): emit step_started
         before the step at submit_index: if an enabled ocr_check has only_new_text, capture + OCR its region once
             (the baseline lines)
+        before every step that sends input: the CURRENT title must still match (a browser keeps its HWND when the
+            tab changes) else pause TITLE_CHANGED (item as for guard trips) - gate G-04
         execute (5.3); a step at index >= submit_index that sent input sets possibly_submitted
-        every capture: masked rects blanked; looks_blank -> pause CAPTURE_BLANK (item as for guard trips)
+        every capture: masked rects blanked; a capture that looks blank is re-checked on the WHOLE client area and
+            only a blank client pauses CAPTURE_BLANK (item as for guard trips); a uniform region (empty result area,
+            the baseline read, wait_text "disappear") never pauses by itself - gate G-01
     status = models.status_for_result(result)
   except UserActivity | ForegroundLost | PointNotOnTarget | InputBlocked: hard pause with that reason (InputBlocked
         -> ERROR with its text; Attention + state PAUSED); item -> PENDING (retried after resume) or, if
@@ -191,15 +203,22 @@ for item in plan.items (queue order):
         item PENDING / REVIEW as for guard trips
   except Exception (anything else): log the traceback; item REVIEW if possibly_submitted else PENDING; pause ERROR
         (Attention with 7.1 "unexpected error" text; the Run page offers 開啟紀錄檔)
-  RATE_LIMITED: policy.on_rate_limit == cooldown and cooldowns_used < max_cooldowns -> state COOLDOWN, emit cooldown
-        every second for cooldown_s, retry the SAME code; else stop(RATE_LIMITED), item -> PENDING with message
-  UNKNOWN (status REVIEW): on_unknown pause -> Attention(UNKNOWN_RESULT, ocr_text, evidence) + pause; continue; stop
+  (order, gate G-11: rate limit, then the unknown-result decision, then the counters)
+  RATE_LIMITED: policy.on_rate_limit == cooldown and cooldowns_used < max_cooldowns (per run) -> state COOLDOWN, emit
+        cooldown every second for cooldown_s (paused time does not count), retry the SAME code; else
+        stop(RATE_LIMITED), item -> PENDING with message; COOLDOWN neither counts nor resets the counters
+  UNKNOWN (status REVIEW): on_unknown pause -> Attention(UNKNOWN_RESULT, ocr_text, evidence) + pause; continue;
+        stop -> StopReason.ERROR with the unknown-result text
+  counters use the status the user chose in that attention (`resolve_attention`), else the attempt's status:
   consecutive failures (FAILED, REVIEW) >= policy.stop_after_failures (> 0) -> stop(FAILURES)
   consecutive INVALID >= policy.pause_after_invalid (> 0) -> pause INVALID_STREAK (Attention, 7.1 text; resume resets)
         any other final status resets both counters
   wait uniform(interval_min_s, interval_max_s), emitting waiting(seconds_left) about once per second, unless it was
         the last code; after a resume wait at least
         interval_min_s since the last submit
+  (the per-code `try` covers code_started .. final status only: the cool-down and the interval run after the item
+   is final, so a stop or failsafe there never changes it; an item still COOLDOWN at run end becomes PENDING with
+   its message kept - gate G-06)
 finally: release everything we hold (modifiers, keys, mouse buttons); keep_awake(False); emit finished(RunSummary)
 ```
 
@@ -217,8 +236,9 @@ finally: release everything we hold (modifiers, keys, mouse buttons); keep_awake
 | app exit during a run | `session.shutdown()`: stop + join (3 s) + deliver the queued final signals | PENDING / REVIEW |
 | crash / kill | queue.json still says RUNNING -> `recover_after_crash()` at next start | REVIEW |
 
-With `pause_on_user_input` on, pressing F8 or moving to the MiniBar is itself physical input, so a pause in the
-middle of a code is immediate - intended. The MiniBar's pause / resume button is disabled for 0.7 s after every
+With `pause_on_user_input` on, pressing F8 or moving to the MiniBar is itself physical input: during input steps
+the guard trips at the next keystroke / click (hard pause, then relabelled USER); during waits (ocr_check polling,
+wait steps, the interval) nothing trips, F8 is the soft pause and the result is still read (gate G-07). The MiniBar's pause / resume button is disabled for 0.7 s after every
 state change, so a click aimed at 暫停 never lands on a freshly shown 繼續. Interrupted-before-submit attempts are not
 written to the history.
 
@@ -239,10 +259,16 @@ written to the history.
 5. Minimum 1 s between codes (models clamp), default 6-8 s; stop or cool down on rate-limit text.
 6. Codes only from the user; never generate, guess, or retry O/0 or I/1 variants (ask the user instead).
 7. A shared profile is executable input. Key steps refuse Win combos and system shortcuts (`models.combo_risk`
-   ERROR: Alt+Tab, Alt+Esc, Alt+F4, Alt+Space, Ctrl+Esc, Ctrl+Shift+Esc, Ctrl+Alt+Delete); shells, terminals and
-   system UI (`models.FORBIDDEN_TARGET_EXES`) are never a target; a browser target needs a title keyword, and the
-   title is re-checked before every code; imports never keep the author's target (`Profile.prepare_import`) and are
-   saved only after the user confirmed the literal step list (`Profile.action_lines`).
+   ERROR: Alt+Tab, Alt+Esc, Alt+F4, Alt+Space, Ctrl+Esc, Ctrl+Shift+Esc, Ctrl+Alt+Delete), browser developer tools /
+   page source (F12, Ctrl+Shift+I/J/C/K, Ctrl+U) and paste (Ctrl+V, Ctrl+Shift+V, Shift+Insert); with a browser
+   target (or a browser `suggested_exe`) also the address-bar / search shortcuts (`models.ADDRESS_BAR_COMBOS`); a
+   type_text with a line break, tab or script URL is a validation warning and a risky import line
+   (`models.text_is_risky`); shells, terminals and system UI (`models.FORBIDDEN_TARGET_EXES`) are never a target,
+   checked on the profile's exe AND on every resolved window (preflight, runner re-find); a target without exe needs
+   a window class or an exact title (`TargetMatch.exe_unknown`, preflight `target_exe_unknown`); a browser target needs
+   a title keyword, and the title is re-checked before every code and before every input step; imports never keep the
+   author's target (`Profile.prepare_import`) and are saved only after the user confirmed the literal step list
+   (`Profile.action_lines`) and the non-default run rules (`Profile.policy_lines`) - integration, gates G-02 / G-03.
 8. Failsafe = the cursor in an OUTER top-left corner of the desktop (`models.in_failsafe_corner`), shown on the
    countdown and in the MiniBar tooltip; F9 is the stop for games that confine the cursor.
 9. AutoPress's own windows never reach OCR (masked captures) and never silently swallow a click (guard message).
@@ -821,7 +847,7 @@ def run(report_path: str) -> int
 | `settings.json` | `Settings` | `AppContext.save_settings()` (G5 settings page, A1 helpers) |
 | `profiles/<id>.autopress.json` | one `Profile` each | `ProfileStore` (G7 pages) |
 | `queue.json` | `{"schema_version": 1, "items": [CodeItem...]}` | `CodeQueue` (G1) |
-| `history.jsonl` | one `AttemptRecord` per line + `"schema_version"` | `HistoryStore` (G1) via RunSession (G4) |
+| `history.jsonl` | one `AttemptRecord` per line + `"schema_version"` | `HistoryStore` (G1) via RunSession (G4); the Codes page's 標記為已兌換 (G6, run_id "manual") |
 | `evidence/<yyyy-mm-dd>/<run_id>_<n>.png` | result-region crops (own windows masked) | runner backend (G4) with `imageio.save_png` |
 | `logs/autopress.log` | rotating log, codes masked | `logsetup` |
 Data folder: `%AUTOPRESS_HOME%` (tests) > portable (`portable.txt` next to the exe or project root -> `<app>/data`) >
@@ -865,7 +891,10 @@ false}, "coord_mode": "auto", "code_format": {"id": "hoyoverse", "charset": "A-Z
 | `focus_window` | 切換到視窗 | restore_minimized (True), timeout_ms 3000, settle_ms 200 | bring the target to front (the runner also does this before every code); failure -> pause FOCUS_LOST |
 | `click_point` | 點擊位置 | point (required), button left, double False, jitter_px 0, settle_ms 30, hold_ms 30, after_ms 120 | resolve with `coord_mode` and the window DPI, +-random jitter, guard (point on target), click, wait |
 | `click_text` | 點擊文字（OCR） | text ("" - must be set; templates use e.g. "兌換\|Redeem"), match exact, region None (= client), nth 0, offset_x/y 0 (px at 96 DPI, x window_dpi / 96), min_score 0.5, upscale 0 (auto), timeout_ms 3000, poll_ms 500, fallback_point None, on_not_found fail, button/double/settle/hold/after | capture -> OCR -> `find_text` (REGEX: the whole text is one pattern); poll until timeout; auto upscale = retry at 2x when not found and the doubled long side stays <= 4096 px; not found -> click fallback_point, else on_not_found: fail -> StepError 「找不到文字「{text}」」, continue -> log 「沒有出現「{text}」，略過這一步」 and go on (dismiss a popup only if it is there) |
-| `type_code` | 輸入序號 | mode unicode, key_delay_ms 15, hold_ms 0, clear_first True, clear_method ctrl_a, split none, separators "-_", group_sizes [] (= code_format.groups), between tab, strip_separators False, verify_region None, after_ms 100 | clear; `codes.normalize.split_code` (NONE: the code exactly as shown in the queue, separators removed only with strip_separators; SEPARATOR: at the separators the code kept from its source, segments may differ in length; FIXED: group sizes); type each segment (VK mode closes the target IME and restores it); Tab between segments when `between` = tab; verify: the NFKC, case-folded OCR text of verify_region without spaces and separators must contain the code without separators, else StepError 「輸入內容與序號不符（可能被輸入法改寫或權限阻擋）。請改用「貼上」或關閉注音後再試。」 |
+| `type_code` | 輸入序號 | mode unicode, key_delay_ms 15, hold_ms 0, clear_first True, clear_method ctrl_a, split none, separators "-_", group_sizes [] (= code_format.groups), between tab, strip_separators False, verify_region None, after_ms 100 | clear; `codes.normalize.split_code` (NONE: the code exactly as shown in the queue, separators removed only with strip_separators; SEPARATOR: at the separators the code kept from its source, segments may differ in length; FIXED: group sizes); type each segment (VK mode closes the target IME and restores it); Tab between segments when `between` = tab;
+with `clear_first` each later box is SELECTED before its segment (Ctrl+A, or End + Shift+Home; nothing for the
+backspace method) so an old code left in boxes 2..n is replaced - no deleting key, because Backspace in an empty
+auto-advance box jumps back on OTP-style pages (gate G-08); verify: the NFKC, case-folded OCR text of verify_region without spaces and separators must contain the code without separators, else StepError 「輸入內容與序號不符（可能被輸入法改寫或權限阻擋）。請改用「貼上」或關閉注音後再試。」 |
 | `type_text` | 輸入文字 | text template `{code} {index} {date} {time}`, mode, key_delay_ms, hold_ms, clear_first False, clear_method, after_ms | e.g. `/redeem {code}` |
 | `key` | 按鍵／組合鍵 | keys "Enter" (combo of KEY_NAMES), repeat 1, interval_ms 50, hold_ms 0, after_ms 100 | `win32.input.press_combo` |
 | `wait` | 等待 | ms 1000, jitter_pct 0 | uniform(ms*(1-j), ms*(1+j)) through RunControl.sleep |
@@ -924,7 +953,7 @@ delays (after_focus 200, after_click 120, key_delay 15, clipboard_restore 300 ms
 run must stay light on the game), det_side 960, warmup_on_start, review_threshold 0.95) · skip_history_on_import
 True, history_skip_statuses [success, used] (SUBMITTED is unconfirmed and never skipped by default) ·
 save_evidence True, evidence_keep_days 30 · daily_cap 0 (= off; attempts per calendar day over all games, counted
-from the history) · active_profile_id · run_selection unfinished|checked · window_geometry · minibar_pos ([x, y] or
+from the history; manual marks, run_id "manual", are not attempts) · active_profile_id · run_selection unfinished|checked · window_geometry · minibar_pos ([x, y] or
 []) · first_run_done.
 
 ### 5.7 Codes and statuses
@@ -1008,7 +1037,8 @@ whose constructor raises NotImplementedError becomes a 「尚未實作」 placeh
 `MainWindow.set_status`): `guard` 「前景保護：開」 (always on), `interval` 「間隔 6–8 秒」 (active profile's policy),
 keycaps F8 暫停 · F9 停止 (configured combos) and 「左上角緊急停止：開／關」 (tooltip: which corner counts on this
 monitor layout, from `models.failsafe_corners`), `target` (active profile's window title or 「找不到目標視窗」,
-refreshed every 2 s), `ocr` (載入中 / 就緒 / 無法使用), `run` (state while running), version.
+refreshed every 2 s), `ocr` (載入中 / 就緒 / 無法使用), `run` (state while running). The version line sits in the
+sidebar footer as in the mock-up the user saw (`set_status("version", ...)` updates it; integration).
 Toasts: top-right, 4 s, max 3.
 Main window minimum 1100x700 logical, default 1280x800, geometry remembered.
 
@@ -1028,7 +1058,8 @@ Main window minimum 1100x700 logical, default 1280x800, geometry remembered.
    (`queue.assign_game`); items need review 「{n} 筆序號需要確認（辨識信心偏低或字元已修正）」 + 逐筆檢查 (selects the
    next REVIEW row). Segmented filter (6 segments, `FILTERS`) + search. Table (CodesTableModel + delegates) with
    inline editing and live validation (`validate_code`), row menu (編輯, 確認無誤 / 重設為待兌換, 略過/取消略過, 移除,
-   複製). Bulk bar for checked/selected rows: 移除, 標記為已兌換, 確認無誤, 重設為待兌換, 指定給目前遊戲, 略過, 上移,
+   複製). Bulk bar for the SELECTED rows (the check boxes stay `CodeItem.checked` for 「只跑勾選的」, which is True by
+   default - bulk on ticked rows would make 移除 hit every code; integration decision): 移除, 標記為已兌換, 確認無誤, 重設為待兌換, 指定給目前遊戲, 略過, 上移,
    下移, 移到最上, 重試失敗, 清除已完成, 匯出 CSV. During a run the plan's rows are read-only (「執行中，請先停止」).
    Empty state with the three import actions and the Ctrl+V keycap tip. Dialogs: PasteDialog (text + live
    candidates, extraction debounced 300 ms + summary 「將加入 {a} 筆，略過 {d} 筆重複、{h} 筆已兌換過」),
@@ -1060,7 +1091,8 @@ Main window minimum 1100x700 logical, default 1280x800, geometry remembered.
    Importing a shared profile (`import_profile_file`): `ProfileStore.read_file` (nothing saved or renamed; target
    already cleared) -> a warning card: 「這個設定檔會對你選的視窗送出下列按鍵與文字。只匯入你信任的人分享的設定檔。」,
    every `Profile.action_lines()` line verbatim (risky lines highlighted: system / navigation shortcuts, fixed text
-   without {code}), the suggested exe and the code format -> 匯入 is enabled only after the checkbox 「我看得懂這些
+   without {code} or with a line break, tab or script URL), the non-default run rules (`Profile.policy_lines()`, loosened
+   safety stops highlighted), the suggested exe and the code format -> 匯入 is enabled only after the checkbox 「我看得懂這些
    動作」 -> `ProfileStore.import_profile` -> the wizard opens on 「選擇目標視窗」. Export asks for an optional title
    keyword (`ProfileStore.export_file(profile, path, title_keyword)`; default none, so window titles with account or
    character names are not shared).
@@ -1180,7 +1212,7 @@ three validation warnings, e.g. risky shortcuts, fixed text without {code}, on_u
 error open_profile (`missing_setup()`: click positions and result regions) · `no_codes` error (no runnable code of
 this game) · `unassigned_codes` info assign_codes ({n} queued codes without a game) · `target_not_set` error
 pick_window · `target_forbidden` error pick_window · `target_title_required` error pick_window (browser without a
-title keyword) · `target_not_found` error pick_window · `target_is_self` error pick_window · `target_multiple`
+title keyword) · `target_exe_unknown` error pick_window (no exe and neither a class nor an exact title) · `target_not_found` error pick_window · `target_is_self` error pick_window · `target_multiple`
 warning pick_window (needs a click; the title of the window that will be used is shown) · `target_minimized` info ·
 `elevated` error restart_admin (standard user: no action) · `elevation_unknown` warning · `size_changed` warning
 realign (「視窗大小與錄製時不同（{a} → {b}），將依比例換算；建議先預覽或重新對準」) · `dpi_changed` warning realign ·
@@ -1226,7 +1258,7 @@ initial delays and after_ms), formatted with `format_duration`; rate-limit cool-
 | G1 | `tests/test_codes_*.py` | normalisation (full-width, dashes, zero-width; "_" / "~" mapped only with ocr=True), every preset (generic keeps lower-case letters), repair only outside charset (repaired characters flagged for text sources too), separators kept for groupless formats and re-grouped for grouped ones, flags = low confidence or repaired, lookalikes separate, split_code modes incl. unequal segments (4-6-2), likely-heuristic, extraction stays linear (1000-word paragraph < 200 ms), detect_format, file encodings (UTF-8/BOM/UTF-16/cp950, CSV, JSON), queue semantics and persistence (reload, broken file, crash recovery with bilingual message, events, per-game duplicates, `runnable(game_key)`, `reset`, `assign_game`, `games`, `retry_failed` FAILED only), history (latest, is_done, query, `update` keeps id and position, remove, corrupt lines, prune), CSV BOM + headers + formula-injection prefix, atomic writes through `storage.write_bytes_atomic` |
 | G2 | `tests/test_ocr_*.py`, `tests/test_capture_*.py` | engine on `text_image` cards (slow): code line read, 兌換 / 取消 click points inside their boxes, 12 px label with upscale; max_side_len 4096 set; alternating det_side calls restore the setting; reread_line; benchmark note for 2560x1440 / 3840x2160 (report only); service: states, priority, cancel, timeout, request callbacks on GUI thread, failing factory -> FAILED, `restart` (same object, DISABLED when not enabled), shutdown during a slow fake inference (daemon thread, no hang); textfind exact/contains/regex (no alternative splitting)/nth/alternatives (pure); imageio Chinese paths, EXIF, QImage round trip, `mask_rects`, save_png via write_bytes_atomic; capture: pixel-exact grab of a pattern window shown by a child process (`clean_env`, marked `realinput` because it appears on the desktop), looks_blank |
 | G3 | `tests/test_win32_*.py` | structure sizes (INPUT 40), argtypes on every prototype, keys mapping/parse_hotkey/combo_from_qt, TargetMatch filtering in find_windows, client_rect/window_info of an own hidden native window (ctypes, works offscreen), elevation of own process, dpi math (pure), failsafe with `models.failsafe_corners` incl. a second monitor LEFT of the primary, wrap-safe tick comparison, InputBlocked on a short SendInput count (mocked), `window_at(skip_own=True)`, `keep_awake`, hotkeys register/1409/unregister (hidden native window, no input), attach on an invalid handle; realinput: typing modes into an own QLineEdit target, clear recipes, clicks, foreground routine, guard trips (ForegroundLost, PointNotOnTarget naming the covering window, same-process roots with allow_same_process), keys and mouse buttons released when the hold's sleep raises (GetAsyncKeyState), clipboard and IME restored on a stop during the restore delay, release_all_modifiers, clipboard snapshot/restore, hotkey delivery while the host window is HIDDEN, `exclude_from_capture` measured with mss on an own window (report the result) |
-| G4 | `tests/test_runner_*.py`, `tests/test_e2e_*.py` | with a fake Backend: every step type, split modes, possibly-submitted rule (`first_submit_index`), StepError after a result kept / after submit REVIEW / before submit FAILED, pause/resume/stop/abort timing (< 100 ms in waits), idempotent pause + USER_INPUT relabel, guard trips -> PENDING/REVIEW, InputBlocked, vanished window -> TARGET_LOST, unexpected exception -> ERROR pause, title change and size change pauses, blank capture pause, masked rects applied to every capture, ocr_check only_new_text (static text, stale previous message, identical message -> UNKNOWN), click_text on_not_found continue, DPI-scaled offsets, rate-limit cool-down then stop, failure counter, invalid streak pause, unknown policy, ETA, bookkeeping (queue + history, missing ids ignored, RUNNING leftovers -> REVIEW, `resolve_attention` via history.update), shutdown delivers the final signals, test_step dry/real, every preflight key, preview marks ignoring own windows, classify delegates to KeywordConfig.classify, build_plan game filter + history-skip + daily cap, waiting signal; realinput e2e against `tools/fake_redeem_app.py`: 5 codes incl. used / invalid / rate-limit, 3-box split and unequal groups, popup dismissal with --popup-on success, --latency-ms with --persist |
+| G4 | `tests/test_runner_*.py`, `tests/test_e2e_*.py` | with a fake Backend: every step type, split modes, possibly-submitted rule (`first_submit_index`), StepError after a result kept / after submit REVIEW / before submit FAILED, pause/resume/stop/abort timing (< 100 ms in waits), idempotent pause + USER_INPUT relabel, guard trips -> PENDING/REVIEW, InputBlocked, vanished window -> TARGET_LOST, unexpected exception -> ERROR pause, title change and size change pauses, blank capture pause, masked rects applied to every capture, ocr_check only_new_text (static text, stale previous message, identical message -> UNKNOWN), click_text on_not_found continue, DPI-scaled offsets, rate-limit cool-down then stop, failure counter, invalid streak pause, unknown policy, ETA, bookkeeping (queue + history, missing ids ignored, RUNNING leftovers -> REVIEW, `resolve_attention` via history.update), shutdown delivers the final signals, test_step dry/real, every preflight key, preview marks ignoring own windows, classify delegates to KeywordConfig.classify, build_plan game filter + history-skip + daily cap, waiting signal; realinput e2e against `tools/fake_redeem_app.py`: 5 codes incl. used / invalid / rate-limit, 3-box split and unequal groups, popup dismissal with --popup-on success, --latency-ms with --persist; integration additions: a uniform region never pauses (only a blank client), the title re-checked before input steps, a different window after TARGET_LOST only after confirmation, later boxes selected before their segment (fake app --prefill / --advance-no-select), stop during a cool-down -> PENDING, the resolved status feeds the counters, physical input trips only at injections |
 | G5 | `tests/test_ui_shell_*.py` | theme apply both themes + tokens, QSS builds, icons for every ICON_NAMES/StepType.icon, widgets API, toast stacking, MainWindow navigation + placeholder for NotImplementedError pages, status bar, settings binding and persistence (OCR changes call `ocr.restart`), hotkey field capture, single-instance lock incl. `--wait-lock`, `setQuitOnLastWindowClosed(False)` (closing a parentless dialog while the main window is hidden does not quit), `--selftest` dispatched before a QApplication exists, welcome shown before MainWindow, crash toast text, `set_run_mode(minimize=True)`, data-folder fallback banner, `build_context` with real stores in tmp (`skip_if_stub` for G1/G2/G4 modules) |
 | G6 | `tests/test_ui_codes_*.py`, `tests/test_ui_history_*.py` | CodesPage builds while RunFlow is a stub (lazy creation), model <-> queue events, filters/search/game filter, no-profile and unassigned banners, 確認無誤 / 重設為待兌換 / 指定給, plan rows read-only during a run, lookalike vs flagged painting, inline edit validation, paste dialog extraction (debounced) + summary, OCR review with FakeOcrService (loading, error, results, 已核對 clears flags), drag-drop of text/image files, CSV export, history filters and requeue with the record's game |
 | G7 | `tests/test_ui_profiles_*.py`, `tests/test_ui_run_*.py` | profile CRUD + dirty prompt + newer-version warning, template creation, step editor round-trips every step type (anchor, label per language, on_not_found, only_new_text), keyword editor, window picker list (fake list; forbidden exes disabled), import flow (read_file -> action_lines card -> checkbox -> import_profile; target always empty), export title keyword, game combo + near-duplicate warning, wizard (close choice, paste one code, realign), overlays math (local -> physical with fake screens), RunFlow sequence with FakeRunSession (preflight block, confirm, countdown 0, hotkeys registered/unregistered, hotkey failure dialog, run mode, masked rects published, F8 debounce, resume countdown, F9 cancels the countdown, attention restores the main window, expand = soft pause, last_test_ok_at after TEST_ONE), real step test countdown + stop, run page reacting to every RunSession signal, attention actions, mini bar (place_away_from, 0.7 s button lock) |
@@ -1282,8 +1314,8 @@ zip to `dist/AutoPress-<version>-win64.zip` with the top folder `AutoPress-<vers
 `請先解壓縮再執行.txt` next to it (running AutoPress.exe from inside the zip fails before any AutoPress code runs).
 README and user guide open with 「下載後先解壓縮」, the SmartScreen steps (「Windows 已保護您的電腦」 -> 其他資訊 ->
 仍要執行) and what to do on an antivirus warning; the README's English section has a short quick start. Reference
-setup: an earlier PyInstaller project of the maintainer (not in the repo; its spec, build.ps1 and licenses/) - read only. Expected size about
-200 MB unpacked (estimate).
+setup: an earlier PyInstaller project of the maintainer (not in the repo; its spec, build.ps1 and licenses/) - read only. Measured at integration
+(2026-11-17): 256.6 MB unpacked, zip 111.4 MB (cv2.pyd 82 MB, onnxruntime 45 MB, PyQt6 39 MB, OCR models 31 MB).
 
 ### 10.2 Licences (G8)
 AutoPress is GPL-3.0 (PyQt6 is GPL). Ship: LICENSE (GPL-3.0 text), THIRD-PARTY-NOTICES.md and `licenses/` with texts
@@ -1291,7 +1323,8 @@ copied from dist-info / sources (never retyped): PyQt6 (GPL-3.0), Qt 6 (LGPL-3.0
 (PSF + incorporated software from `Doc/license.rst`), rapidocr (Apache-2.0) + PP-OCRv6 model attribution (Apache-2.0,
 (c) Baidu/PaddleOCR), onnxruntime (MIT), OpenCV (Apache-2.0 + LICENSE-3RD-PARTY), numpy (BSD), Pillow (MIT-CMU), mss
 (MIT), shapely (BSD) + GEOS (LGPL-2.1), pyclipper (MIT/Boost), omegaconf (BSD), PyYAML (MIT), protobuf (BSD), flatbuffers
-(Apache-2.0), requests / urllib3 / idna / certifi (MPL-2.0) / charset-normalizer / tqdm / colorlog / six / packaging.
+(Apache-2.0), requests / urllib3 / idna / certifi (MPL-2.0) / charset-normalizer / tqdm / colorlog / colorama (colorlog needs it on
+Windows; integration) / six / packaging.
 `.gitattributes`: license files `-text` (keep upstream line endings).
 
 ### 10.3 Integration order (orchestrator)
@@ -1336,7 +1369,7 @@ Integration checks R7: every referenced image exists and comes from the real app
 6. `MiniBar` never activating relies on WindowDoesNotAcceptFocus -> WS_EX_NOACTIVATE (measured exstyle for that flag
    set); clicking it while a game is foreground was not tested.
 7. History in JSON lines, read fully at startup: fine for thousands of records (not measured beyond that).
-8. The onedir size (~200 MB) is an estimate; onefile was rejected for start time.
+8. The onedir size: measured 256.6 MB unpacked / 111.4 MB zip at integration; onefile was rejected for start time.
 9. Physical-input detection compares GetLastInputInfo with our last SendInput; it never fired with real input in the
    research (only its premise was measured).
 10. `SetWindowDisplayAffinity(WDA_EXCLUDEFROMCAPTURE)` with mss / BitBlt is UNVERIFIED: the A2 probe on 2026-11-17
@@ -1348,7 +1381,12 @@ Integration checks R7: every referenced image exists and comes from the real app
     the invalid-streak pause catch a mode that types nothing or the wrong text.
 12. The keyword rule v2 (no bare redeemed / claimed / 過期, fuzzy only from 9 characters, SUCCESS + other class or
     negation -> UNKNOWN) and the only_new_text baseline were checked on text samples only, not on real pages; pages
-    that re-render an identical message in place give UNKNOWN (the profile can turn only_new_text off).
+    that re-render an identical message in place give UNKNOWN 「送出後結果區沒有出現新的訊息（可能和上一筆的訊息
+    相同）」 - two valid codes in a row on a page whose result label keeps 「兌換成功」 pause at the second code, and a
+    repeated rate-limit message after a cool-down is UNKNOWN too. Integration decision: kept as the safe default (a
+    stale message read as the new result would mark a code redeemed forever); the user's choice in the attention
+    now feeds the failure counter (G-11), so confirming each such code no longer stops the run; turning
+    only_new_text off is only safe when the page clears the label at submit. Dialog / toast results are unaffected.
 13. DPI-scaled offsets assume web pages and dialogs scale linearly with Windows scaling; not measured on a real
     125 % / 150 % machine (11.3). Template coordinate modes (web: offset, game: auto) are proposals.
 14. Timing constants chosen without measurement: 1.5 s F8-after-auto-pause window, 0.7 s mini bar button lock,
@@ -1437,3 +1475,16 @@ Every item of `docs/review/spec_critique_tech.md` (T01-T41) and `docs/review/spe
 - PX-32 -> accepted: listed in 11.11; the in-game template uses VK mode with IME closing and a 30 ms hold, and the invalid-streak pause plus verify hints catch a mode that types nothing.
 - PX-33 -> accepted: the game field is an editable combo of known names with a near-duplicate warning; renaming moves queued codes (6.4.2).
 - PX-34 -> accepted in part: Korean keywords removed; rejected deferring daily cap, portable mode, system theme, evidence viewer, {date}/{time}, wait_text "disappear", three clear methods, eight presets and the hotkey conflict test: each is small, mostly already in the foundation or the research, and several were promised in the design preview.
+- G-01 (gate, integration) -> accepted: a blank-looking capture is re-checked on the whole client area; only a blank client pauses CAPTURE_BLANK (runner.steps.StepContext.capture; capture.py docstring) (2.5).
+- G-02 (gate, integration) -> accepted: combo_risk refuses developer tools / page source / paste, browser targets refuse the address-bar shortcuts, risky type_text is flagged, the import card lists non-default run rules (`Profile.policy_lines`); tests in tests/test_models.py (2.7, 6.4.2).
+- G-03 (gate, integration) -> accepted: resolved windows of forbidden programs or AutoPress are never used (preflight and runner), `TargetMatch.exe_unknown` -> validation ERROR + preflight `target_exe_unknown`, a different window after TARGET_LOST needs the user's confirmation (2.5, 2.7, 7.2).
+- G-04 (gate, integration) -> accepted: the title is re-checked before every step that sends input (`runner.steps.TitleChanged` -> TITLE_CHANGED pause) (2.5).
+- G-05 (gate, integration) -> accepted as built by G7: several pages may own a RunFlow but only the registered active one runs; resume / stop / Run-page buttons delegate to it; cross-page test in tests/test_ui_run_page.py (2.4).
+- G-06 (gate, integration) -> accepted: the interval and cool-down run after the item is final; COOLDOWN leftovers become PENDING at run end (2.5).
+- G-07 (gate, integration) -> accepted: `tick()` checks only the failsafe; physical input only in InjectGuard.check (2.3, 2.6).
+- G-08 (gate, integration) -> accepted with a safer variant: later boxes are SELECTED (not cleared with Backspace) before their segment; fake app `--prefill` / `--advance-no-select` + realinput e2e case (5.3).
+- G-09 (gate, integration) -> accepted: `RunSession.test_step` (and FakeRunSession) now default to dry_run=True; key steps and press_combo refuse combo_risk ERROR combos (G4 / G3); a real test resets the input baseline first and a guard trip ends it with StepTestResult(ok=False, 7.1 text) (2.7.4).
+- G-11 (gate, integration) -> accepted: policy order rate limit -> unknown decision -> counters; counters use the resolved status; cool-downs per run; on_unknown stop -> StopReason.ERROR (2.5).
+- G-12 (gate, integration) -> accepted: manual marks (run_id "manual") are not daily-cap attempts; the Codes page is a history writer (5.1, 5.6).
+- G-10, G-13 - G-25 (gate minors) -> deferred to the next iteration unless already covered (G-16 / G-19 / G-12 handled by G1 / G6; G-25 FILTERS "done" = success/submitted/used decided by G6); see the integration notes.
+- Group decisions confirmed at integration: version line in the sidebar footer (G5, 6.3); bulk actions on selected rows (G6, 6.4.1); only_new_text kept as the safe default (G4, 11.12); 7.1 texts that the table lacks (wait_text timeout, points_missing, no_codes, target_is_self, target_multiple, target_minimized, fast_interval, OCR disabled, target re-bind) live in runner/messages.py with English pairs.

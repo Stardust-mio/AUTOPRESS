@@ -22,6 +22,7 @@ Layout inside the data folder::
     evidence/<yyyy-mm-dd>/*.png   result-region crops saved by ocr_check steps
     logs/autopress.log            rotating log (logsetup.setup_logging)
     instance.lock                 single-instance QLockFile (ui.app)
+    cache/ui/*.svg                combo / spin box arrow images written by ui.theme (safe to delete)
 
 Bundled read-only resources live in ``autopress/resources`` (templates, icon), which the
 PyInstaller spec ships as ``autopress/resources`` inside the bundle.

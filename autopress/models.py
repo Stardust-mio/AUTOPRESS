@@ -591,12 +591,27 @@ _RISKY_COMBOS: frozenset[str] = frozenset({
     "Ctrl+P", "Ctrl+S", "Ctrl+J",
 })
 
+_DEVTOOLS_COMBOS: frozenset[str] = frozenset({
+    "F12", "Ctrl+Shift+I", "Ctrl+Shift+J", "Ctrl+Shift+C", "Ctrl+Shift+K", "Ctrl+U",
+})
+"""Open the browser's developer tools / console / page source (integration, gate G-02): a shared
+profile could type script into the console of the user's logged-in page. Refused (ERROR)."""
+
+_PASTE_COMBOS: frozenset[str] = frozenset({"Ctrl+V", "Ctrl+Shift+V", "Shift+Insert"})
+"""Paste the USER's clipboard (not the code) into the target (gate G-02). Refused (ERROR); the
+code is entered by type_code (whose paste mode restores the clipboard)."""
+
+ADDRESS_BAR_COMBOS: frozenset[str] = frozenset({"Ctrl+L", "Alt+D", "F6", "Ctrl+K", "Ctrl+E"})
+"""Address-bar / search-box shortcuts: refused (validation ERROR) when the target or the
+suggested program is a browser (typed text would become a URL / search; gate G-02)."""
+
 
 def combo_risk(text: str) -> tuple[IssueLevel | None, str]:
     """Safety class of a key-step combo (a shared profile is executable input, SPEC 2.7):
     (ERROR, reason) - refused in key steps: any Win combo, Alt+Tab, Alt+Esc, Alt+F4, Alt+Space,
     Ctrl+Esc, Ctrl+Shift+Esc, Ctrl+Alt+Delete (they leave the target, open system UI or launch
-    programs); (WARNING, reason) - allowed but highlighted (validation, import summary):
+    programs), browser developer tools / page source (F12, Ctrl+Shift+I/J/C/K, Ctrl+U) and paste
+    (Ctrl+V, Ctrl+Shift+V, Shift+Insert: the user's clipboard, never the code); (WARNING, reason) - allowed but highlighted (validation, import summary):
     shortcuts that move the focus or navigate in browsers / chat apps (Ctrl+L, Alt+D, F6, Ctrl+K,
     Ctrl+E, Ctrl+T, Ctrl+N, Ctrl+W, Ctrl+Tab, Alt+Left/Right, Ctrl+O/P/S/J ...);
     (None, "") otherwise, also for unparsable text (validation reports that separately)."""
@@ -612,6 +627,14 @@ def combo_risk(text: str) -> tuple[IssueLevel | None, str]:
     if forbidden:
         return IssueLevel.ERROR, tr(f"「{format_combo(names)}」是系統快捷鍵，設定檔不能使用",
                                     f"'{format_combo(names)}' is a system shortcut; profiles cannot use it")
+    if format_combo(names) in _DEVTOOLS_COMBOS:
+        return IssueLevel.ERROR, tr(f"「{format_combo(names)}」會開啟瀏覽器的開發者工具或原始碼，設定檔不能使用",
+                                    f"'{format_combo(names)}' opens the browser's developer tools or page source; "
+                                    "profiles cannot use it")
+    if format_combo(names) in _PASTE_COMBOS:
+        return IssueLevel.ERROR, tr(f"「{format_combo(names)}」會貼上你剪貼簿裡的內容，設定檔不能使用（序號請用「輸入序號」步驟）",
+                                    f"'{format_combo(names)}' pastes whatever is on your clipboard; profiles cannot "
+                                    "use it (use a Type code step for the code)")
     if format_combo(names) in _RISKY_COMBOS:
         return IssueLevel.WARNING, tr(f"「{format_combo(names)}」可能切換分頁、開網址列或開新視窗",
                                       f"'{format_combo(names)}' may switch tabs, open the address bar or a new window")
@@ -913,6 +936,15 @@ class TargetMatch:
         """A browser target without a title keyword would match any tab of that browser."""
         return self.is_browser() and (self.title_mode is TitleMatch.ANY or not self.title.strip())
 
+    def exe_unknown(self) -> bool:
+        """Integration (gate G-03): no exe (the picker could not read the program, or a profile built
+        by hand) AND neither a window class nor an exact title - such a target would match a window
+        of ANY program whose title contains the keyword. Validation ERROR / preflight
+        ``target_exe_unknown``."""
+        if self.is_empty() or self.exe.strip() or self.class_name:
+            return False
+        return not (self.title_mode is TitleMatch.EXACT and self.title.strip())
+
     def pattern_error(self) -> str | None:
         """Localized error if ``title`` is an invalid regex in REGEX mode, else None."""
         if self.title_mode is TitleMatch.REGEX:
@@ -1171,7 +1203,7 @@ class Step:
             verb = tr("出現", "appears") if p.appear else tr("消失", "disappears")
             return tr(f"等「{p.text}」{verb}", f"until '{p.text}' {verb}")
         if isinstance(p, OcrCheckParams):
-            return tr("範圍已設定", "Region set") if p.region else tr("整個視窗", "Whole window")
+            return tr("範圍已設定", "Region set") if p.region else tr("尚未設定結果範圍", "Result region not set")
         return ""
 
     def validate(self, index: int, profile: Profile | None = None) -> list[ValidationIssue]:
@@ -1218,6 +1250,10 @@ class Step:
             elif "{code}" not in p.text:
                 add(IssueLevel.WARNING, "text", "輸入的文字不含 {code}，每筆都會輸入同樣的內容",
                     "the text has no {code}: the same text is typed for every code")
+            if p.text and text_is_risky(p.text):
+                add(IssueLevel.WARNING, "text", "輸入的文字含有換行、Tab 或 javascript: 等網址指令，可能直接送出或執行",
+                    "the text contains a line break, a tab or a script URL such as javascript: and may submit or run "
+                    "something")
         if isinstance(p, KeyParams):
             try:
                 parse_combo_names(p.keys)
@@ -1225,12 +1261,27 @@ class Step:
                 add(IssueLevel.ERROR, "keys", f"無法辨識的按鍵「{p.keys}」", f"unrecognised keys '{p.keys}'")
             else:
                 level, reason = combo_risk(p.keys)
+                if (level is IssueLevel.WARNING and profile is not None and profile.browser_target()
+                        and format_combo(parse_combo_names(p.keys)) in ADDRESS_BAR_COMBOS):
+                    level = IssueLevel.ERROR
+                    reason = tr(f"在瀏覽器裡「{p.keys}」會跳到網址列或搜尋列，設定檔不能使用",
+                                f"in a browser '{p.keys}' jumps to the address bar or search box; profiles cannot "
+                                "use it")
                 if level is not None:
                     add(level, "keys", reason, reason)
         if isinstance(p, OcrCheckParams) and p.region is None:
             add(IssueLevel.ERROR, "region", "尚未設定結果範圍（結果訊息出現的位置）",
                 "the result region (where the result message appears) is not set")
         return out
+
+
+_SCRIPT_URL = re.compile(r"\b(?:javascript|vbscript|data)\s*:", re.IGNORECASE)
+
+
+def text_is_risky(text: str) -> bool:
+    """A type_text text with a line break or tab (acts as Enter / moves on) or a script URL
+    (javascript:, vbscript:, data:) - highlighted in the import summary (gate G-02)."""
+    return any(c in text for c in "\r\n\t") or _SCRIPT_URL.search(text) is not None
 
 
 def make_step(step_type: StepType, delays: DelaySettings | None = None) -> Step:
@@ -1533,8 +1584,10 @@ class Profile:
     def action_lines(self) -> list[tuple[str, bool]]:
         """Every enabled step as one literal line for the import summary, in order:
         ``(text, risky)``. Literal key combos and texts are shown verbatim (author labels are NOT
-        used, so a label cannot disguise a step); ``risky`` marks combo_risk warnings, type_text
-        without {code}, and click_text steps that are skipped when nothing is found."""
+        used, so a label cannot disguise a step); ``risky`` marks combo_risk warnings and errors,
+        and type_text without {code} or with a line break, tab or script URL (shown as ↵ / ⇥).
+        click_text steps skipped when nothing is found say so in the text (not risky: every
+        template closes its result popup that way). Non-default run rules: ``policy_lines()``."""
         out: list[tuple[str, bool]] = []
         for n, (_i, s) in enumerate(self.enabled_steps(), 1):
             p = s.params
@@ -1548,8 +1601,9 @@ class Profile:
             elif isinstance(p, TypeCodeParams):
                 detail = p.mode.label()
             elif isinstance(p, TypeTextParams):
-                detail = f"「{p.text}」"
-                risky = "{code}" not in p.text
+                shown = p.text.replace("\r\n", "\n").replace("\r", "\n").replace("\n", "↵").replace("\t", "⇥")
+                detail = f"「{shown}」"
+                risky = "{code}" not in p.text or text_is_risky(p.text)
             elif isinstance(p, KeyParams):
                 level, reason = combo_risk(p.keys)
                 detail = p.keys + (f" ×{p.repeat}" if p.repeat > 1 else "") + (f"（{reason}）" if reason else "")
@@ -1557,6 +1611,44 @@ class Profile:
             else:
                 detail = s.summary()
             out.append((f"{n}. {s.type.label()}：{detail}" if detail else f"{n}. {s.type.label()}", risky))
+        return out
+
+    def browser_target(self) -> bool:
+        """The target, or for an import without a target the author's program, is a browser."""
+        return self.target.is_browser() or self.suggested_exe.casefold() in BROWSER_EXES
+
+    def policy_lines(self) -> list[tuple[str, bool]]:
+        """Run rules that differ from the defaults, as ``(text, risky)`` lines for the import
+        summary (gate G-02: a shared file can switch off every safety stop). ``risky``: shorter
+        intervals, more cool-downs, no stop after failures, no pause after invalid codes, unknown
+        results that are not asked about."""
+        d, p = RunPolicy(), self.policy
+        out: list[tuple[str, bool]] = []
+        if (p.interval_min_s, p.interval_max_s) != (d.interval_min_s, d.interval_max_s):
+            out.append((tr(f"每筆間隔 {p.interval_min_s:g}–{p.interval_max_s:g} 秒",
+                           f"Wait {p.interval_min_s:g}-{p.interval_max_s:g} s between codes"),
+                        p.interval_min_s < d.interval_min_s))
+        if p.on_rate_limit is not d.on_rate_limit:
+            out.append((tr("遇到「操作過於頻繁」就停止", "Stop at a rate-limit message")
+                        if p.on_rate_limit is RateLimitAction.STOP
+                        else tr("遇到「操作過於頻繁」就冷卻後重試", "Cool down and retry at a rate-limit message"), False))
+        if p.cooldown_s != d.cooldown_s:
+            out.append((tr(f"冷卻 {p.cooldown_s} 秒", f"Cool down for {p.cooldown_s} s"), p.cooldown_s < d.cooldown_s))
+        if p.max_cooldowns != d.max_cooldowns:
+            out.append((tr(f"最多冷卻 {p.max_cooldowns} 次", f"At most {p.max_cooldowns} cool-downs"),
+                        p.max_cooldowns > d.max_cooldowns))
+        if p.stop_after_failures != d.stop_after_failures:
+            out.append((tr("連續失敗也不停止", "Never stop after failures") if p.stop_after_failures == 0
+                        else tr(f"連續 {p.stop_after_failures} 次失敗才停止", f"Stop after {p.stop_after_failures} failures in a row"),
+                        p.stop_after_failures == 0 or p.stop_after_failures > d.stop_after_failures))
+        if p.on_unknown is not d.on_unknown:
+            out.append((tr("無法判斷結果時：標記「需確認」後繼續", "Unknown result: mark for review and go on")
+                        if p.on_unknown is UnknownAction.CONTINUE
+                        else tr("無法判斷結果時：停止", "Unknown result: stop"), p.on_unknown is UnknownAction.CONTINUE))
+        if p.pause_after_invalid != d.pause_after_invalid:
+            out.append((tr("連續無效也不暫停", "Never pause after invalid codes") if p.pause_after_invalid == 0
+                        else tr(f"連續 {p.pause_after_invalid} 筆無效才暫停", f"Pause after {p.pause_after_invalid} invalid codes in a row"),
+                        p.pause_after_invalid == 0 or p.pause_after_invalid > d.pause_after_invalid))
         return out
 
     def prepare_import(self) -> None:
@@ -1599,6 +1691,11 @@ class Profile:
         elif self.target.needs_title():
             add(IssueLevel.ERROR, "target.title", "瀏覽器目標必須設定標題關鍵字（例如「兌換」），以免輸入到其他分頁",
                 "A browser target needs a title keyword (e.g. 'Redeem') so input never goes to another tab")
+        elif self.target.exe_unknown():
+            add(IssueLevel.ERROR, "target.exe",
+                "讀不到目標視窗的程式名稱，任何標題相符的視窗都可能被當成目標；請重新選擇視窗，或把標題比對改成「標題完全相同」",
+                "The target's program is unknown, so any window with a matching title could be used; pick the "
+                "window again or set the title match to 'Title equals'")
         err = self.target.pattern_error()
         if err:
             out.append(ValidationIssue(IssueLevel.ERROR, "target.title", err))
@@ -1993,7 +2090,7 @@ PREFLIGHT_KEYS: tuple[str, ...] = (
     "target_multiple", "target_minimized", "elevated", "elevation_unknown", "size_changed", "ocr_failed",
     "ocr_loading", "capture_blank", "no_result_check", "fast_interval", "daily_cap",
     "profile_warnings", "target_forbidden", "target_title_required", "unassigned_codes", "untested_profile",
-    "dpi_changed", "no_verify", "estimate",
+    "dpi_changed", "no_verify", "estimate", "target_exe_unknown",
 )
 """Every PreflightIssue.key runner.preflight may produce (SPEC section 7.2)."""
 

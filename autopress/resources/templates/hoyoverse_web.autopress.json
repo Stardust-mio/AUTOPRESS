@@ -1,0 +1,241 @@
+{
+  "schema_version": 1,
+  "id": "template-hoyoverse-web",
+  "name": "HoYoverse 網頁兌換",
+  "game": "",
+  "description": "原神、崩壞：星穹鐵道、絕區零的官方兌換網頁。開始前先在網頁上登入，並選好伺服器與角色；建立後在「遊戲」欄填上是哪一款遊戲。序號為 6–16 個英數字，大小寫照原樣輸入。",
+  "author": "AutoPress",
+  "target": {
+    "exe": "",
+    "title": "",
+    "title_mode": "contains",
+    "class_name": "",
+    "allow_same_process": false
+  },
+  "suggested_exe": "",
+  "coord_mode": "offset",
+  "code_format": {
+    "id": "hoyoverse",
+    "charset": "A-Za-z0-9",
+    "case_sensitive": true,
+    "min_len": 6,
+    "max_len": 16,
+    "groups": [],
+    "separator": "-",
+    "regex": ""
+  },
+  "steps": [
+    {
+      "type": "wait_text",
+      "params": {
+        "text": "兌換|兑换|Redeem|Redemption|交換",
+        "match": "contains",
+        "region": null,
+        "appear": true,
+        "timeout_ms": 5000,
+        "poll_ms": 500,
+        "on_timeout": "fail"
+      },
+      "enabled": true,
+      "label": "確認兌換頁面已開啟（已登入並選好伺服器與角色）",
+      "label_en": "Check that the redeem page is open (logged in, server and character chosen)",
+      "id": "tpl-hoyo-1"
+    },
+    {
+      "type": "click_point",
+      "params": {
+        "point": null,
+        "button": "left",
+        "double": false,
+        "after_ms": 150
+      },
+      "enabled": true,
+      "label": "點一下「兌換碼」輸入框",
+      "label_en": "Click the redemption code box",
+      "id": "tpl-hoyo-2"
+    },
+    {
+      "type": "type_code",
+      "params": {
+        "mode": "unicode",
+        "key_delay_ms": 15,
+        "hold_ms": 0,
+        "clear_first": true,
+        "clear_method": "ctrl_a",
+        "split": "none",
+        "after_ms": 100
+      },
+      "enabled": true,
+      "label": "輸入序號",
+      "label_en": "Type the code",
+      "id": "tpl-hoyo-3"
+    },
+    {
+      "type": "click_text",
+      "params": {
+        "text": "兌換|兑换|Redeem|交換",
+        "match": "exact",
+        "region": null,
+        "timeout_ms": 3000,
+        "poll_ms": 500,
+        "on_not_found": "fail",
+        "after_ms": 150
+      },
+      "enabled": true,
+      "label": "按下「兌換」按鈕",
+      "label_en": "Press the Redeem button",
+      "id": "tpl-hoyo-4"
+    },
+    {
+      "type": "ocr_check",
+      "params": {
+        "region": null,
+        "initial_delay_ms": 800,
+        "timeout_ms": 5000,
+        "poll_ms": 500,
+        "save_evidence": true,
+        "only_new_text": true
+      },
+      "enabled": true,
+      "label": "拉出結果訊息出現的範圍",
+      "label_en": "Drag over the area where the result message appears",
+      "id": "tpl-hoyo-5"
+    },
+    {
+      "type": "click_text",
+      "params": {
+        "text": "確定|确定|OK|關閉|关闭|Close",
+        "match": "exact",
+        "region": null,
+        "timeout_ms": 1500,
+        "poll_ms": 500,
+        "on_not_found": "continue",
+        "after_ms": 300
+      },
+      "enabled": true,
+      "label": "關閉結果視窗（沒有就略過）",
+      "label_en": "Close the result popup (skipped if there is none)",
+      "id": "tpl-hoyo-6"
+    }
+  ],
+  "keywords": {
+    "groups": {
+      "rate_limited": [
+        "過於頻繁",
+        "太頻繁",
+        "稍後再試",
+        "过于频繁",
+        "太频繁",
+        "稍后再试",
+        "too many",
+        "too frequent",
+        "try again later",
+        "on cooldown",
+        "rate limit",
+        "しばらく",
+        "時間をおいて"
+      ],
+      "used": [
+        "已被使用",
+        "已使用",
+        "已兌換過",
+        "已被兌換",
+        "已兑换过",
+        "已被兑换",
+        "already been used",
+        "already used",
+        "already redeemed",
+        "already claimed",
+        "claimed already",
+        "redeemed already",
+        "既に使用",
+        "使用済み"
+      ],
+      "expired": [
+        "已過期",
+        "已失效",
+        "已逾期",
+        "已过期",
+        "expired",
+        "期限切れ",
+        "有効期限が切れ"
+      ],
+      "invalid": [
+        "無效",
+        "不存在",
+        "序號錯誤",
+        "兌換碼錯誤",
+        "輸入錯誤",
+        "无效",
+        "兑换码错误",
+        "输入错误",
+        "invalid",
+        "incorrect",
+        "does not exist",
+        "not found",
+        "無効"
+      ],
+      "ineligible": [
+        "等級不足",
+        "已達上限",
+        "使用上限",
+        "伺服器不符",
+        "地區不符",
+        "等级不足",
+        "已达上限",
+        "服务器不符",
+        "地区不符",
+        "level too low",
+        "level requirement",
+        "limit reached",
+        "max usage",
+        "not available in",
+        "your region",
+        "レベルが足り",
+        "not activated"
+      ],
+      "success": [
+        "兌換成功",
+        "領取成功",
+        "成功兌換",
+        "成功領取",
+        "已發送",
+        "已寄送",
+        "發送成功",
+        "兑换成功",
+        "领取成功",
+        "成功兑换",
+        "成功领取",
+        "已发送",
+        "发送成功",
+        "successfully",
+        "redemption successful",
+        "code redeemed",
+        "code claimed",
+        "交換しました",
+        "成功しました",
+        "受け取りました"
+      ]
+    },
+    "order": [
+      "rate_limited",
+      "used",
+      "expired",
+      "invalid",
+      "ineligible",
+      "success"
+    ],
+    "fuzzy": true
+  },
+  "template": {
+    "key": "hoyoverse_web",
+    "title_zh": "HoYoverse 網頁兌換",
+    "title_en": "HoYoverse web redeem",
+    "description_zh": "原神、崩壞：星穹鐵道、絕區零的官方兌換網頁。開始前先在網頁上登入，並選好伺服器與角色；建立後在「遊戲」欄填上是哪一款遊戲。序號為 6–16 個英數字，大小寫照原樣輸入。",
+    "description_en": "Official redeem pages of Genshin Impact, Honkai: Star Rail and Zenless Zone Zero. Log in on the page and choose the server and character before you start; after creating it, enter which game it is in the game field. Codes are 6-16 letters and digits, typed with their case as written.",
+    "order": 20
+  },
+  "created_at": "2026-11-17T00:00:00+08:00",
+  "updated_at": "2026-11-17T00:00:00+08:00",
+  "last_test_ok_at": ""
+}

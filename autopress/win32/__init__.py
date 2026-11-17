@@ -1,4 +1,4 @@
-# OWNED BY G3 - replace this stub
+# OWNED BY G3
 """Win32 layer (G3), ctypes only: input injection, clipboard, windows, DPI, elevation, hotkeys.
 
 Other groups import the public modules (keys, input, clipboard, windows, elevation, dpi,

@@ -1,0 +1,132 @@
+{
+  "schema_version": 1,
+  "id": "template-web-generic",
+  "name": "網頁兌換（通用）",
+  "game": "",
+  "description": "適用大多數官方兌換網頁：點輸入框、輸入序號、按「兌換」，再讀取結果訊息。建立後請選擇瀏覽器視窗（標題要含「兌換」之類的關鍵字），並在「遊戲」欄填上遊戲名稱。",
+  "author": "AutoPress",
+  "target": {
+    "exe": "",
+    "title": "",
+    "title_mode": "contains",
+    "class_name": "",
+    "allow_same_process": false
+  },
+  "suggested_exe": "",
+  "coord_mode": "offset",
+  "code_format": {
+    "id": "generic",
+    "charset": "A-Za-z0-9",
+    "case_sensitive": true,
+    "min_len": 6,
+    "max_len": 24,
+    "groups": [],
+    "separator": "-",
+    "regex": ""
+  },
+  "steps": [
+    {
+      "type": "wait_text",
+      "params": {
+        "text": "兌換|兑换|序號|序号|禮包|礼包|Redeem|Code|コード",
+        "match": "contains",
+        "region": null,
+        "appear": true,
+        "timeout_ms": 5000,
+        "poll_ms": 500,
+        "on_timeout": "fail"
+      },
+      "enabled": true,
+      "label": "確認兌換頁面已開啟",
+      "label_en": "Check that the redeem page is open",
+      "id": "tpl-web-1"
+    },
+    {
+      "type": "click_point",
+      "params": {
+        "point": null,
+        "button": "left",
+        "double": false,
+        "after_ms": 150
+      },
+      "enabled": true,
+      "label": "點一下序號輸入框",
+      "label_en": "Click the code input box",
+      "id": "tpl-web-2"
+    },
+    {
+      "type": "type_code",
+      "params": {
+        "mode": "unicode",
+        "key_delay_ms": 15,
+        "hold_ms": 0,
+        "clear_first": true,
+        "clear_method": "ctrl_a",
+        "split": "none",
+        "after_ms": 100
+      },
+      "enabled": true,
+      "label": "輸入序號",
+      "label_en": "Type the code",
+      "id": "tpl-web-3"
+    },
+    {
+      "type": "click_text",
+      "params": {
+        "text": "兌換|兑换|Redeem|Submit|送出|確認|确认|Confirm",
+        "match": "exact",
+        "region": null,
+        "timeout_ms": 3000,
+        "poll_ms": 500,
+        "on_not_found": "fail",
+        "after_ms": 150
+      },
+      "enabled": true,
+      "label": "按下「兌換」按鈕",
+      "label_en": "Press the Redeem button",
+      "id": "tpl-web-4"
+    },
+    {
+      "type": "ocr_check",
+      "params": {
+        "region": null,
+        "initial_delay_ms": 800,
+        "timeout_ms": 5000,
+        "poll_ms": 500,
+        "save_evidence": true,
+        "only_new_text": true
+      },
+      "enabled": true,
+      "label": "拉出結果訊息出現的範圍",
+      "label_en": "Drag over the area where the result message appears",
+      "id": "tpl-web-5"
+    },
+    {
+      "type": "click_text",
+      "params": {
+        "text": "確定|确定|OK|關閉|关闭|Close",
+        "match": "exact",
+        "region": null,
+        "timeout_ms": 1500,
+        "poll_ms": 500,
+        "on_not_found": "continue",
+        "after_ms": 300
+      },
+      "enabled": true,
+      "label": "關閉結果視窗（沒有就略過）",
+      "label_en": "Close the result popup (skipped if there is none)",
+      "id": "tpl-web-6"
+    }
+  ],
+  "template": {
+    "key": "web_generic",
+    "title_zh": "網頁兌換（通用）",
+    "title_en": "Web redeem page (generic)",
+    "description_zh": "適用大多數官方兌換網頁：點輸入框、輸入序號、按「兌換」，再讀取結果訊息。建立後請選擇瀏覽器視窗（標題要含「兌換」之類的關鍵字），並在「遊戲」欄填上遊戲名稱。",
+    "description_en": "For most official redeem web pages: click the input box, type the code, press Redeem and read the result message. After creating it, pick the browser window (its title needs a keyword such as \"Redeem\") and enter the game name.",
+    "order": 10
+  },
+  "created_at": "2026-11-17T00:00:00+08:00",
+  "updated_at": "2026-11-17T00:00:00+08:00",
+  "last_test_ok_at": ""
+}

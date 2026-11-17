@@ -1,0 +1,20 @@
+# OWNED BY G8 (SPEC 3.2, 10.2).
+# Text files are stored with LF line endings; checkouts use the platform's native line endings.
+* text=auto
+
+# Binary files: no line-ending conversion, no text diff or merge.
+*.png binary
+*.jpg binary
+*.ico binary
+*.onnx binary
+*.zip binary
+
+# Third-party licence texts stay byte for byte as shipped upstream (some mix CRLF and LF):
+# no line-ending conversion, so a clone gets exactly the files that are in the release zip.
+LICENSE -text
+licenses/** -text
+
+# Windows scripts keep CRLF, whatever core.autocrlf says (build.ps1 is UTF-8 with BOM).
+*.ps1 text eol=crlf
+*.bat text eol=crlf
+*.cmd text eol=crlf

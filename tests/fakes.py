@@ -545,7 +545,7 @@ class FakeRunSession(QObject):
         self.masked_rects = list(rects)
 
     def test_step(self, profile: Profile, step_index: int, settings: Settings, *, sample_code: str = "TEST-1234",
-                  dry_run: bool = False, target_hwnd: int = 0) -> None:
+                  dry_run: bool = True, target_hwnd: int = 0) -> None:
         self.calls.append(("test_step", (profile.id, step_index, sample_code, dry_run)))
         res = StepTestResult(ok=True, step_index=step_index, message="(fake) OK")
         QTimer.singleShot(0, lambda: self.test_finished.emit(res))

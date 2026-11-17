@@ -1,4 +1,4 @@
-# OWNED BY G3 - replace this stub
+# OWNED BY G3
 """Keep the display and the system awake during a run (decision PX-31).
 
 A 5-minute rate-limit cool-down equals common display-off / lock timeouts; a locked session has
@@ -10,10 +10,22 @@ Standard API, not measured in the research.
 
 from __future__ import annotations
 
-__stub__ = True
+import logging
+
+from . import api
+
+log = logging.getLogger(__name__)
 
 
 def keep_awake(active: bool) -> bool:
     """active: SetThreadExecutionState(ES_CONTINUOUS | ES_SYSTEM_REQUIRED | ES_DISPLAY_REQUIRED);
     inactive: SetThreadExecutionState(ES_CONTINUOUS). True when the call succeeded."""
-    raise NotImplementedError
+    flags = api.ES_CONTINUOUS
+    if active:
+        flags |= api.ES_SYSTEM_REQUIRED | api.ES_DISPLAY_REQUIRED
+    # returns the previous state (a fresh thread reports ES_CONTINUOUS, measured) or 0 on failure
+    previous = int(api.SetThreadExecutionState(flags))
+    if previous == 0:
+        log.warning("SetThreadExecutionState(%#x) failed", flags)
+        return False
+    return True

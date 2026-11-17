@@ -1,4 +1,4 @@
-# OWNED BY G5 - replace this stub
+# OWNED BY G5
 """AutoPress launcher (also the PyInstaller entry script).
 
     .venv/Scripts/python.exe main.py                        normal start
@@ -16,8 +16,6 @@ import sys
 from pathlib import Path
 
 os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
-
-__stub__ = True
 
 if not getattr(sys, "frozen", False):
     _ROOT = str(Path(__file__).resolve().parent)

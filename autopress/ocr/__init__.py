@@ -1,4 +1,4 @@
-# OWNED BY G2 - replace this stub
+# OWNED BY G2
 """OCR (G2): RapidOCR engine wrapper, the single-worker OCR service, text finding, image I/O.
 
 Never import rapidocr / onnxruntime at module import time of anything else: engine.py imports

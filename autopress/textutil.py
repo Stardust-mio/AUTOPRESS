@@ -30,7 +30,7 @@ __all__ = [
     "squash",
 ]
 
-_ZERO_WIDTH = {"​", "‌", "‍", "⁠", "﻿"}
+_ZERO_WIDTH = {"\u200b", "\u200c", "\u200d", "\u2060", "\ufeff"}
 
 
 def nfkc(text: str) -> str:

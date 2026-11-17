@@ -27,3 +27,6 @@ desktop.ini
 .vscode/
 .idea/
 .claude/
+
+# User-guide screenshots before tools/screenshots.py adds the callouts (G8; only annotated images are committed)
+/docs/images/raw/
