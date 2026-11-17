@@ -1,0 +1,288 @@
+{
+ "plan": "ime",
+ "started": "20261117_133718",
+ "layout": "0x4040404",
+ "results": [
+  {
+   "runs": 20,
+   "exact": 20,
+   "rate": 1.0,
+   "e2e_ms_median": 81.58,
+   "cps_median": 171.6,
+   "fails": [],
+   "label": "ime_unicode",
+   "mode": "unicode",
+   "string": "ABCD-1234-EFGH",
+   "delay_ms": 5,
+   "capslock": false,
+   "restore_delay_ms": 0
+  },
+  {
+   "runs": 20,
+   "exact": 20,
+   "rate": 1.0,
+   "e2e_ms_median": 60.87,
+   "cps_median": 180.7,
+   "fails": [],
+   "label": "ime_unicode",
+   "mode": "unicode",
+   "string": "AbC-123_xyz",
+   "delay_ms": 5,
+   "capslock": false,
+   "restore_delay_ms": 0
+  },
+  {
+   "runs": 20,
+   "exact": 20,
+   "rate": 1.0,
+   "e2e_ms_median": 95.49,
+   "cps_median": 167.6,
+   "fails": [],
+   "label": "ime_unicode",
+   "mode": "unicode",
+   "string": "a1B2c3D4e5F6g7H8",
+   "delay_ms": 5,
+   "capslock": false,
+   "restore_delay_ms": 0
+  },
+  {
+   "runs": 20,
+   "exact": 0,
+   "rate": 0.0,
+   "e2e_ms_median": null,
+   "cps_median": null,
+   "fails": [
+    ""
+   ],
+   "label": "ime_unicode",
+   "mode": "unicode",
+   "string": "測試ABC",
+   "delay_ms": 5,
+   "capslock": false,
+   "restore_delay_ms": 0
+  },
+  {
+   "runs": 20,
+   "exact": 0,
+   "rate": 0.0,
+   "e2e_ms_median": null,
+   "cps_median": null,
+   "fails": [
+    "ABCDEFGH"
+   ],
+   "label": "ime_vk",
+   "mode": "vk",
+   "string": "ABCD-1234-EFGH",
+   "delay_ms": 5,
+   "capslock": false,
+   "restore_delay_ms": 0
+  },
+  {
+   "runs": 20,
+   "exact": 0,
+   "rate": 0.0,
+   "e2e_ms_median": null,
+   "cps_median": null,
+   "fails": [
+    "AC_"
+   ],
+   "label": "ime_vk",
+   "mode": "vk",
+   "string": "AbC-123_xyz",
+   "delay_ms": 5,
+   "capslock": false,
+   "restore_delay_ms": 0
+  },
+  {
+   "runs": 20,
+   "exact": 0,
+   "rate": 0.0,
+   "e2e_ms_median": null,
+   "cps_median": null,
+   "fails": [
+    "BD"
+   ],
+   "label": "ime_vk",
+   "mode": "vk",
+   "string": "a1B2c3D4e5F6g7H8",
+   "delay_ms": 5,
+   "capslock": false,
+   "restore_delay_ms": 0
+  },
+  {
+   "runs": 20,
+   "exact": 20,
+   "rate": 1.0,
+   "e2e_ms_median": 2.98,
+   "cps_median": 4691.6,
+   "fails": [],
+   "label": "ime_clip",
+   "mode": "clip",
+   "string": "ABCD-1234-EFGH",
+   "delay_ms": 0,
+   "capslock": false,
+   "restore_delay_ms": 100
+  },
+  {
+   "runs": 20,
+   "exact": 20,
+   "rate": 1.0,
+   "e2e_ms_median": 2.78,
+   "cps_median": 3958.3,
+   "fails": [],
+   "label": "ime_clip",
+   "mode": "clip",
+   "string": "AbC-123_xyz",
+   "delay_ms": 0,
+   "capslock": false,
+   "restore_delay_ms": 100
+  },
+  {
+   "runs": 20,
+   "exact": 20,
+   "rate": 1.0,
+   "e2e_ms_median": 3.07,
+   "cps_median": 5210.4,
+   "fails": [],
+   "label": "ime_clip",
+   "mode": "clip",
+   "string": "a1B2c3D4e5F6g7H8",
+   "delay_ms": 0,
+   "capslock": false,
+   "restore_delay_ms": 100
+  },
+  {
+   "runs": 20,
+   "exact": 20,
+   "rate": 1.0,
+   "e2e_ms_median": 3.31,
+   "cps_median": 1511.8,
+   "fails": [],
+   "label": "ime_clip",
+   "mode": "clip",
+   "string": "測試ABC",
+   "delay_ms": 0,
+   "capslock": false,
+   "restore_delay_ms": 100
+  },
+  {
+   "runs": 20,
+   "exact": 20,
+   "rate": 1.0,
+   "e2e_ms_median": 78.47,
+   "cps_median": 178.4,
+   "fails": [],
+   "label": "ime_closed_vk",
+   "mode": "vk",
+   "string": "ABCD-1234-EFGH",
+   "delay_ms": 5,
+   "capslock": false,
+   "restore_delay_ms": 0
+  },
+  {
+   "runs": 20,
+   "exact": 20,
+   "rate": 1.0,
+   "e2e_ms_median": 60.88,
+   "cps_median": 180.7,
+   "fails": [],
+   "label": "ime_closed_vk",
+   "mode": "vk",
+   "string": "AbC-123_xyz",
+   "delay_ms": 5,
+   "capslock": false,
+   "restore_delay_ms": 0
+  },
+  {
+   "runs": 20,
+   "exact": 20,
+   "rate": 1.0,
+   "e2e_ms_median": 89.73,
+   "cps_median": 178.3,
+   "fails": [],
+   "label": "ime_closed_vk",
+   "mode": "vk",
+   "string": "a1B2c3D4e5F6g7H8",
+   "delay_ms": 5,
+   "capslock": false,
+   "restore_delay_ms": 0
+  }
+ ],
+ "notes": [],
+ "clipboard_formats_saved": [
+  [
+   49341,
+   "PNG",
+   413191
+  ],
+  [
+   17,
+   "",
+   1832724
+  ],
+  [
+   49378,
+   "HTML Format",
+   199
+  ],
+  [
+   8,
+   "",
+   1832640
+  ]
+ ],
+ "ensure_fg": {
+  "ok": true,
+  "method": "already",
+  "tries": 0
+ },
+ "ime_state_start_xproc": {
+  "open": 1,
+  "conv": 1
+ },
+ "ime_close_sent": true,
+ "ime_state_after_close_xproc": {
+  "open": 0,
+  "conv": 0
+ },
+ "ime_state_restored_xproc": {
+  "open": 1,
+  "conv": 1
+ },
+ "skips": [],
+ "gaps": [
+  {
+   "user_active": false,
+   "fg_ok": true
+  },
+  {
+   "user_active": false,
+   "fg_ok": true
+  },
+  {
+   "user_active": false,
+   "fg_ok": true
+  },
+  {
+   "user_active": false,
+   "fg_ok": true
+  }
+ ],
+ "released_modifiers": [],
+ "capslock_restored": true,
+ "clipboard_restored": true,
+ "ime_states_logged": [
+  {
+   "open": true,
+   "conv": 1
+  },
+  {
+   "open": false,
+   "conv": 0
+  },
+  {
+   "open": true,
+   "conv": 1
+  }
+ ]
+}

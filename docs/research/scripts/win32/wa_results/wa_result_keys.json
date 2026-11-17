@@ -1,0 +1,283 @@
+{
+ "started": "20261117_140243",
+ "numlock": 1,
+ "checks": [
+  {
+   "name": "type",
+   "expect": "ABCD-1234",
+   "got": "ABCD-1234",
+   "ok": true
+  },
+  {
+   "name": "Home(ext)+X",
+   "expect": "XABCD-1234",
+   "got": "XABCD-1234",
+   "ok": true
+  },
+  {
+   "name": "End(ext)+Y",
+   "expect": "XABCD-1234Y",
+   "got": "XABCD-1234Y",
+   "ok": true
+  },
+  {
+   "name": "Left,Left,Delete(ext)",
+   "expect": "XABCD-123Y",
+   "got": "XABCD-123Y",
+   "ok": true
+  },
+  {
+   "name": "Backspace",
+   "expect": "XABCD-12Y",
+   "got": "XABCD-12Y",
+   "ok": true
+  },
+  {
+   "name": "Right(ext)+Z",
+   "expect": "XABCD-12YZ",
+   "got": "XABCD-12YZ",
+   "ok": true
+  },
+  {
+   "name": "Ctrl+A,Backspace",
+   "expect": "",
+   "got": "",
+   "ok": true
+  },
+  {
+   "name": "Enter->submit",
+   "expect": "ENTER-TEST",
+   "got": "ENTER-TEST",
+   "ok": true
+  },
+  {
+   "name": "Tab moves focus edit->submit",
+   "got": [
+    [
+     "edit",
+     "out"
+    ],
+    [
+     "submit",
+     "in"
+    ]
+   ],
+   "ok": true
+  },
+  {
+   "name": "Shift+Tab back to edit",
+   "got": [
+    [
+     "submit",
+     "out"
+    ],
+    [
+     "edit",
+     "in"
+    ]
+   ],
+   "ok": true
+  },
+  {
+   "name": "Esc reaches edit",
+   "got": 2,
+   "ok": true
+  },
+  {
+   "name": "VK_LEFT without EXTENDEDKEY still moves caret (Qt)",
+   "expect": "AXB",
+   "got": "AXB",
+   "ok": true
+  }
+ ],
+ "notes": [],
+ "ensure_fg": {
+  "ok": true,
+  "method": "already",
+  "tries": 0
+ },
+ "up_down_events": [
+  [
+   "down",
+   16777235,
+   57416
+  ],
+  [
+   "up",
+   16777235,
+   57416
+  ],
+  [
+   "down",
+   16777237,
+   57424
+  ],
+  [
+   "up",
+   16777237,
+   57424
+  ]
+ ],
+ "left_no_ext": {
+  "qt": [
+   [
+    75,
+    true
+   ]
+  ],
+  "raw": [
+   [
+    75,
+    0
+   ],
+   [
+    75,
+    1
+   ]
+  ]
+ },
+ "left_ext": {
+  "qt": [
+   [
+    57419,
+    false
+   ]
+  ],
+  "raw": [
+   [
+    75,
+    2
+   ],
+   [
+    75,
+    3
+   ]
+  ]
+ },
+ "scan_0x4B_no_ext": {
+  "text": "AB4",
+  "keys": [
+   [
+    231,
+    0,
+    "A"
+   ],
+   [
+    231,
+    0,
+    "B"
+   ],
+   [
+    100,
+    75,
+    "4"
+   ]
+  ]
+ },
+ "scan_0x4B_ext": {
+  "text": "ABX4",
+  "keys": [
+   [
+    37,
+    57419
+   ],
+   [
+    231,
+    0
+   ]
+  ]
+ },
+ "raw_q": [
+  [
+   81,
+   0,
+   0,
+   0,
+   1095782995
+  ],
+  [
+   81,
+   0,
+   1,
+   0,
+   1095782995
+  ],
+  [
+   16,
+   42,
+   0,
+   0,
+   1095782995
+  ],
+  [
+   81,
+   16,
+   0,
+   0,
+   1095782995
+  ],
+  [
+   81,
+   16,
+   1,
+   0,
+   1095782995
+  ],
+  [
+   16,
+   42,
+   1,
+   0,
+   1095782995
+  ]
+ ],
+ "qt_q": [
+  [
+   81,
+   0,
+   "q"
+  ],
+  [
+   16,
+   42,
+   ""
+  ],
+  [
+   81,
+   16,
+   "Q"
+  ],
+  [
+   231,
+   0,
+   "Q"
+  ]
+ ],
+ "enter_to_submit_ms": {
+  "n": 20,
+  "median": 1.17,
+  "max": 1.7
+ },
+ "clear_recipes": {
+  "ctrl_a": {
+   "runs": 20,
+   "cleared": 20
+  },
+  "end_shift_home": {
+   "runs": 20,
+   "cleared": 20
+  },
+  "backspace": {
+   "runs": 20,
+   "cleared": 20
+  }
+ },
+ "skips": [],
+ "gaps": [
+  {
+   "user_active": false,
+   "fg_ok": true
+  }
+ ],
+ "released_modifiers": []
+}

@@ -1,0 +1,119 @@
+{
+ "plan": "cliprestore",
+ "started": "20261117_133846",
+ "layout": "0x4040404",
+ "results": [
+  {
+   "runs": 20,
+   "exact": 0,
+   "rate": 0.0,
+   "e2e_ms_median": null,
+   "cps_median": null,
+   "fails": [
+    "WA-SENTINEL-OLD"
+   ],
+   "label": "clip_restore_0ms",
+   "mode": "clip",
+   "string": "ABCD-1234-EFGH",
+   "delay_ms": 0,
+   "capslock": false,
+   "restore_delay_ms": 0
+  },
+  {
+   "runs": 20,
+   "exact": 20,
+   "rate": 1.0,
+   "e2e_ms_median": 2.1,
+   "cps_median": 6658.6,
+   "fails": [],
+   "label": "clip_restore_2ms",
+   "mode": "clip",
+   "string": "ABCD-1234-EFGH",
+   "delay_ms": 0,
+   "capslock": false,
+   "restore_delay_ms": 2
+  },
+  {
+   "runs": 20,
+   "exact": 20,
+   "rate": 1.0,
+   "e2e_ms_median": 2.23,
+   "cps_median": 6272.5,
+   "fails": [],
+   "label": "clip_restore_10ms",
+   "mode": "clip",
+   "string": "ABCD-1234-EFGH",
+   "delay_ms": 0,
+   "capslock": false,
+   "restore_delay_ms": 10
+  },
+  {
+   "runs": 20,
+   "exact": 20,
+   "rate": 1.0,
+   "e2e_ms_median": 1.82,
+   "cps_median": 7705.9,
+   "fails": [],
+   "label": "clip_restore_30ms",
+   "mode": "clip",
+   "string": "ABCD-1234-EFGH",
+   "delay_ms": 0,
+   "capslock": false,
+   "restore_delay_ms": 30
+  },
+  {
+   "runs": 20,
+   "exact": 20,
+   "rate": 1.0,
+   "e2e_ms_median": 1.87,
+   "cps_median": 7504.9,
+   "fails": [],
+   "label": "clip_restore_100ms",
+   "mode": "clip",
+   "string": "ABCD-1234-EFGH",
+   "delay_ms": 0,
+   "capslock": false,
+   "restore_delay_ms": 100
+  }
+ ],
+ "notes": [],
+ "clipboard_formats_saved": [
+  [
+   49341,
+   "PNG",
+   413191
+  ],
+  [
+   17,
+   "",
+   1832724
+  ],
+  [
+   49378,
+   "HTML Format",
+   199
+  ],
+  [
+   8,
+   "",
+   1832640
+  ]
+ ],
+ "ensure_fg": {
+  "ok": true,
+  "method": "already",
+  "tries": 0
+ },
+ "ime_state_start_xproc": null,
+ "skips": [],
+ "gaps": [],
+ "released_modifiers": [],
+ "capslock_restored": true,
+ "clipboard_restored": true,
+ "ime_states_logged": [
+  {
+   "open": false,
+   "conv": 0
+  }
+ ]
+}

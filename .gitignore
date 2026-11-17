@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv*/
+.pytest_cache/
+*.egg-info/
+
+# PyInstaller / build output
+/build/
+/dist/
+
+# Runtime data and logs (portable mode writes next to the app)
+/data/
+/logs/
+*.log
+
+# Raw research event logs (multi-MB; the summarized wa_result_*.json files are kept)
+docs/research/scripts/win32/wa_results/wa_log_*.jsonl
+
+# Local backups (CLAUDE.md backup rule: <file>.bak-<yyyyMMdd>)
+*.bak-*
+
+# OS / editor / tool state
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+.claude/

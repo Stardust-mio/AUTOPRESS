@@ -1,0 +1,671 @@
+{
+ "started": "20261117_134406",
+ "lock_timeout_ms": 200000,
+ "trials": [
+  {
+   "method": "inproc_plain",
+   "ret": true,
+   "ok": true,
+   "ms": 10.3,
+   "trial": 0
+  },
+  {
+   "method": "inproc_restore",
+   "ret": true,
+   "ok": true,
+   "ms": 15.5,
+   "trial": 0
+  },
+  {
+   "method": "inproc_attach",
+   "ret": true,
+   "ok": true,
+   "ms": 6.0,
+   "trial": 0
+  },
+  {
+   "method": "inproc_plain",
+   "ret": true,
+   "ok": true,
+   "ms": 10.7,
+   "trial": 0
+  },
+  {
+   "method": "inproc_routine",
+   "ret": true,
+   "ok": true,
+   "routine_method": "input",
+   "routine_tries": 2,
+   "ms": 257.3,
+   "trial": 0
+  },
+  {
+   "method": "inproc_plain",
+   "ret": false,
+   "ok": false,
+   "ms": 305.1,
+   "trial": 1
+  },
+  {
+   "method": "inproc_restore",
+   "ret": true,
+   "ok": true,
+   "ms": 8.4,
+   "trial": 1
+  },
+  {
+   "method": "inproc_attach",
+   "ret": true,
+   "ok": true,
+   "ms": 5.2,
+   "trial": 1
+  },
+  {
+   "method": "inproc_plain",
+   "ret": true,
+   "ok": true,
+   "ms": 11.5,
+   "trial": 1
+  },
+  {
+   "method": "inproc_routine",
+   "ret": true,
+   "ok": true,
+   "routine_method": "input",
+   "routine_tries": 2,
+   "ms": 257.0,
+   "trial": 1
+  },
+  {
+   "method": "inproc_plain",
+   "ret": false,
+   "ok": false,
+   "ms": 301.8,
+   "trial": 2
+  },
+  {
+   "method": "inproc_restore",
+   "ret": true,
+   "ok": true,
+   "ms": 8.9,
+   "trial": 2
+  },
+  {
+   "method": "inproc_attach",
+   "ret": true,
+   "ok": true,
+   "ms": 4.3,
+   "trial": 2
+  },
+  {
+   "method": "inproc_plain",
+   "ret": true,
+   "ok": true,
+   "ms": 10.5,
+   "trial": 2
+  },
+  {
+   "method": "inproc_routine",
+   "ret": true,
+   "ok": true,
+   "routine_method": "input",
+   "routine_tries": 2,
+   "ms": 259.0,
+   "trial": 2
+  },
+  {
+   "method": "inproc_plain",
+   "ret": false,
+   "ok": false,
+   "ms": 300.6,
+   "trial": 3
+  },
+  {
+   "method": "inproc_restore",
+   "ret": true,
+   "ok": true,
+   "ms": 11.4,
+   "trial": 3
+  },
+  {
+   "method": "inproc_attach",
+   "ret": true,
+   "ok": true,
+   "ms": 6.7,
+   "trial": 3
+  },
+  {
+   "method": "inproc_plain",
+   "ret": true,
+   "ok": true,
+   "ms": 10.7,
+   "trial": 3
+  },
+  {
+   "method": "inproc_routine",
+   "ret": true,
+   "ok": true,
+   "routine_method": "input",
+   "routine_tries": 2,
+   "ms": 256.0,
+   "trial": 3
+  },
+  {
+   "method": "inproc_plain",
+   "ret": false,
+   "ok": false,
+   "ms": 316.3,
+   "trial": 4
+  },
+  {
+   "method": "inproc_restore",
+   "ret": true,
+   "ok": true,
+   "ms": 9.3,
+   "trial": 4
+  },
+  {
+   "method": "inproc_attach",
+   "ret": true,
+   "ok": true,
+   "ms": 5.6,
+   "trial": 4
+  },
+  {
+   "method": "inproc_plain",
+   "ret": true,
+   "ok": true,
+   "ms": 12.0,
+   "trial": 4
+  },
+  {
+   "method": "inproc_routine",
+   "ret": true,
+   "ok": true,
+   "routine_method": "input",
+   "routine_tries": 2,
+   "ms": 260.8,
+   "trial": 4
+  },
+  {
+   "method": "inproc_plain",
+   "ret": false,
+   "ok": false,
+   "ms": 304.1,
+   "trial": 5
+  },
+  {
+   "method": "inproc_restore",
+   "ret": true,
+   "ok": true,
+   "ms": 7.3,
+   "trial": 5
+  },
+  {
+   "method": "inproc_attach",
+   "ret": true,
+   "ok": true,
+   "ms": 5.5,
+   "trial": 5
+  },
+  {
+   "method": "inproc_plain",
+   "ret": true,
+   "ok": true,
+   "ms": 10.6,
+   "trial": 5
+  },
+  {
+   "method": "inproc_routine",
+   "ret": true,
+   "ok": true,
+   "routine_method": "input",
+   "routine_tries": 2,
+   "ms": 260.0,
+   "trial": 5
+  },
+  {
+   "method": "inproc_plain",
+   "ret": false,
+   "ok": false,
+   "ms": 307.1,
+   "trial": 6
+  },
+  {
+   "method": "inproc_restore",
+   "ret": true,
+   "ok": true,
+   "ms": 6.9,
+   "trial": 6
+  },
+  {
+   "method": "inproc_attach",
+   "ret": true,
+   "ok": true,
+   "ms": 3.8,
+   "trial": 6
+  },
+  {
+   "method": "inproc_plain",
+   "ret": true,
+   "ok": true,
+   "ms": 10.7,
+   "trial": 6
+  },
+  {
+   "method": "inproc_routine",
+   "ret": true,
+   "ok": true,
+   "routine_method": "input",
+   "routine_tries": 2,
+   "ms": 256.4,
+   "trial": 6
+  },
+  {
+   "method": "inproc_plain",
+   "ret": false,
+   "ok": false,
+   "ms": 302.2,
+   "trial": 7
+  },
+  {
+   "method": "inproc_restore",
+   "ret": true,
+   "ok": true,
+   "ms": 13.9,
+   "trial": 7
+  },
+  {
+   "method": "inproc_attach",
+   "ret": true,
+   "ok": true,
+   "ms": 4.7,
+   "trial": 7
+  },
+  {
+   "method": "inproc_plain",
+   "ret": true,
+   "ok": true,
+   "ms": 10.9,
+   "trial": 7
+  },
+  {
+   "method": "inproc_routine",
+   "ret": true,
+   "ok": true,
+   "routine_method": "input",
+   "routine_tries": 2,
+   "ms": 256.8,
+   "trial": 7
+  },
+  {
+   "method": "inproc_plain",
+   "ret": false,
+   "ok": false,
+   "ms": 311.1,
+   "trial": 8
+  },
+  {
+   "method": "inproc_restore",
+   "ret": true,
+   "ok": true,
+   "ms": 9.1,
+   "trial": 8
+  },
+  {
+   "method": "inproc_attach",
+   "ret": true,
+   "ok": true,
+   "ms": 3.1,
+   "trial": 8
+  },
+  {
+   "method": "inproc_plain",
+   "ret": true,
+   "ok": true,
+   "ms": 10.2,
+   "trial": 8
+  },
+  {
+   "method": "inproc_routine",
+   "ret": true,
+   "ok": true,
+   "routine_method": "input",
+   "routine_tries": 2,
+   "ms": 260.5,
+   "trial": 8
+  },
+  {
+   "method": "inproc_plain",
+   "ret": false,
+   "ok": false,
+   "ms": 300.9,
+   "trial": 9
+  },
+  {
+   "method": "inproc_restore",
+   "ret": true,
+   "ok": true,
+   "ms": 7.9,
+   "trial": 9
+  },
+  {
+   "method": "inproc_attach",
+   "ret": true,
+   "ok": true,
+   "ms": 4.2,
+   "trial": 9
+  },
+  {
+   "method": "inproc_plain",
+   "ret": true,
+   "ok": true,
+   "ms": 11.3,
+   "trial": 9
+  },
+  {
+   "method": "inproc_routine",
+   "ret": true,
+   "ok": true,
+   "routine_method": "input",
+   "routine_tries": 2,
+   "ms": 257.4,
+   "trial": 9
+  }
+ ],
+ "decoy_activation": [
+  {
+   "ok": true,
+   "ret": true,
+   "method": "input"
+  },
+  {
+   "ok": true,
+   "ret": true,
+   "method": "input"
+  },
+  {
+   "ok": true,
+   "ret": true,
+   "method": "input"
+  },
+  {
+   "ok": true,
+   "ret": true,
+   "method": "input"
+  },
+  {
+   "ok": true,
+   "ret": true,
+   "method": "input"
+  },
+  {
+   "ok": true,
+   "ret": true,
+   "method": "input"
+  },
+  {
+   "ok": true,
+   "ret": true,
+   "method": "input"
+  },
+  {
+   "ok": true,
+   "ret": true,
+   "method": "input"
+  },
+  {
+   "ok": true,
+   "ret": true,
+   "method": "input"
+  },
+  {
+   "ok": true,
+   "ret": true,
+   "method": "input"
+  },
+  {
+   "ok": true,
+   "ret": true,
+   "method": "input"
+  },
+  {
+   "ok": true,
+   "ret": true,
+   "method": "input"
+  },
+  {
+   "ok": true,
+   "ret": true,
+   "method": "input"
+  },
+  {
+   "ok": true,
+   "ret": true,
+   "method": "input"
+  },
+  {
+   "ok": true,
+   "ret": true,
+   "method": "input"
+  },
+  {
+   "ok": true,
+   "ret": true,
+   "method": "input"
+  },
+  {
+   "ok": true,
+   "ret": true,
+   "method": "input"
+  },
+  {
+   "ok": true,
+   "ret": true,
+   "method": "input"
+  },
+  {
+   "ok": true,
+   "ret": true,
+   "method": "input"
+  },
+  {
+   "ok": true,
+   "ret": true,
+   "method": "input"
+  },
+  {
+   "ok": true,
+   "ret": true,
+   "method": "input"
+  },
+  {
+   "ok": true,
+   "ret": true,
+   "method": "input"
+  },
+  {
+   "ok": true,
+   "ret": true,
+   "method": "input"
+  },
+  {
+   "ok": true,
+   "ret": true,
+   "method": "input"
+  },
+  {
+   "ok": true,
+   "ret": true,
+   "method": "input"
+  },
+  {
+   "ok": true,
+   "ret": true,
+   "method": "input"
+  },
+  {
+   "ok": true,
+   "ret": true,
+   "method": "input"
+  },
+  {
+   "ok": true,
+   "ret": true,
+   "method": "input"
+  },
+  {
+   "ok": true,
+   "ret": true,
+   "method": "input"
+  },
+  {
+   "ok": true,
+   "ret": true,
+   "method": "input"
+  },
+  {
+   "ok": true,
+   "ret": true,
+   "method": "input"
+  },
+  {
+   "ok": true,
+   "ret": true,
+   "method": "input"
+  },
+  {
+   "ok": true,
+   "ret": true,
+   "method": "input"
+  },
+  {
+   "ok": true,
+   "ret": true,
+   "method": "input"
+  },
+  {
+   "ok": true,
+   "ret": true,
+   "method": "input"
+  },
+  {
+   "ok": true,
+   "ret": true,
+   "method": "input"
+  },
+  {
+   "ok": true,
+   "ret": true,
+   "method": "input"
+  },
+  {
+   "ok": true,
+   "ret": true,
+   "method": "input"
+  },
+  {
+   "ok": true,
+   "ret": true,
+   "method": "input"
+  },
+  {
+   "ok": true,
+   "ret": true,
+   "method": "input"
+  },
+  {
+   "ok": true,
+   "ret": true,
+   "method": "input"
+  },
+  {
+   "ok": true,
+   "ret": true,
+   "method": "input"
+  },
+  {
+   "ok": true,
+   "ret": true,
+   "method": "input"
+  },
+  {
+   "ok": true,
+   "ret": true,
+   "method": "input"
+  },
+  {
+   "ok": true,
+   "ret": true,
+   "method": "input"
+  },
+  {
+   "ok": true,
+   "ret": true,
+   "method": "input"
+  },
+  {
+   "ok": true,
+   "ret": true,
+   "method": "input"
+  },
+  {
+   "ok": true,
+   "ret": true,
+   "method": "input"
+  },
+  {
+   "ok": true,
+   "ret": true,
+   "method": "input"
+  },
+  {
+   "ok": true,
+   "ret": true,
+   "method": "input"
+  }
+ ],
+ "fg_after_launch": {
+  "is_target": false,
+  "is_decoy": true
+ },
+ "methods": [
+  "inproc_plain",
+  "inproc_restore",
+  "inproc_attach",
+  "inproc_plain",
+  "inproc_routine"
+ ],
+ "summary": {
+  "inproc_plain": {
+   "n": 20,
+   "ok": 11,
+   "ret_true": 11,
+   "skipped": 0,
+   "routine_methods": {}
+  },
+  "inproc_restore": {
+   "n": 10,
+   "ok": 10,
+   "ret_true": 10,
+   "skipped": 0,
+   "routine_methods": {}
+  },
+  "inproc_attach": {
+   "n": 10,
+   "ok": 10,
+   "ret_true": 10,
+   "skipped": 0,
+   "routine_methods": {}
+  },
+  "inproc_routine": {
+   "n": 10,
+   "ok": 10,
+   "ret_true": 10,
+   "skipped": 0,
+   "routine_methods": {
+    "input": 10
+   }
+  }
+ }
+}

@@ -1,0 +1,74 @@
+{
+ "started": "20261117_140441",
+ "text": "abcdefghij",
+ "configs": [
+  {
+   "mode": "vk",
+   "hold_ms": 0,
+   "delay_ms": 30,
+   "runs": 5,
+   "keys": 50,
+   "text_ok": 5,
+   "poll_edges": 0,
+   "poll_edge_or_lsb": 47,
+   "raw_keydowns": 50
+  },
+  {
+   "mode": "vk",
+   "hold_ms": 10,
+   "delay_ms": 30,
+   "runs": 5,
+   "keys": 50,
+   "text_ok": 5,
+   "poll_edges": 45,
+   "poll_edge_or_lsb": 50,
+   "raw_keydowns": 50
+  },
+  {
+   "mode": "vk",
+   "hold_ms": 20,
+   "delay_ms": 30,
+   "runs": 5,
+   "keys": 50,
+   "text_ok": 5,
+   "poll_edges": 50,
+   "poll_edge_or_lsb": 50,
+   "raw_keydowns": 50
+  },
+  {
+   "mode": "vk",
+   "hold_ms": 40,
+   "delay_ms": 30,
+   "runs": 5,
+   "keys": 50,
+   "text_ok": 5,
+   "poll_edges": 50,
+   "poll_edge_or_lsb": 50,
+   "raw_keydowns": 50
+  },
+  {
+   "mode": "unicode",
+   "hold_ms": 0,
+   "delay_ms": 30,
+   "runs": 5,
+   "keys": 50,
+   "text_ok": 5,
+   "poll_edges": 0,
+   "poll_edge_or_lsb": 0,
+   "raw_keydowns": 0
+  }
+ ],
+ "ensure_fg": {
+  "ok": true,
+  "method": "already",
+  "tries": 0
+ },
+ "skips": [],
+ "gaps": [
+  {
+   "user_active": false,
+   "fg_ok": true
+  }
+ ],
+ "released": []
+}

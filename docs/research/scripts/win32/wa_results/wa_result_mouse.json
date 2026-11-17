@@ -1,0 +1,291 @@
+{
+ "started": "20261117_140313",
+ "double_click_time_ms": 500,
+ "virtual_screen": [
+  -1920,
+  0,
+  3840,
+  1080
+ ],
+ "normalization": {
+  "center": {
+   "points": 159,
+   "exact": 159,
+   "misses": []
+  },
+  "classic": {
+   "points": 159,
+   "exact": 157,
+   "misses": [
+    [
+     -1874,
+     850,
+     -1875,
+     850
+    ],
+    [
+     -1901,
+     977,
+     -1902,
+     977
+    ]
+   ]
+  },
+  "no_virtualdesk": [
+   [
+    0,
+    0,
+    0,
+    0
+   ],
+   [
+    65535,
+    65535,
+    1919,
+    1079
+   ],
+   [
+    32768,
+    32768,
+    960,
+    540
+   ]
+  ],
+  "cursor_restored": true
+ },
+ "ensure_fg": {
+  "ok": true,
+  "method": "already",
+  "tries": 0
+ },
+ "info": {
+  "hwnd": 33555820,
+  "pid": 43556,
+  "tid": 36308,
+  "title": "WA Target mouse 43328",
+  "dpr": 1.0,
+  "window_rect": [
+   392,
+   389,
+   888,
+   598
+  ],
+  "client_rect": [
+   400,
+   420,
+   880,
+   590
+  ],
+  "edit_rect": [
+   411,
+   494,
+   753,
+   515
+  ],
+  "submit_rect": [
+   759,
+   487,
+   869,
+   523
+  ],
+  "submit_logical_global": [
+   759,
+   487,
+   110,
+   36
+  ],
+  "screen": "MSI MP251W E2 (1)",
+  "t_ns": 2802982153717200
+ },
+ "click_methods": {
+  "sendinput_atomic": {
+   "runs": 20,
+   "submit_ok": 20,
+   "max_pos_err_px": 0.0,
+   "press_latency_ms_median": 2.5
+  },
+  "setcursorpos": {
+   "runs": 20,
+   "submit_ok": 20,
+   "max_pos_err_px": 0.0,
+   "press_latency_ms_median": 2.11
+  },
+  "sendinput_settle30_hold30": {
+   "runs": 20,
+   "submit_ok": 20,
+   "max_pos_err_px": 0.0,
+   "press_latency_ms_median": 45.34
+  }
+ },
+ "edge_precision": [
+  {
+   "pt": [
+    759,
+    487
+   ],
+   "inside": true,
+   "submitted": true,
+   "ok": true
+  },
+  {
+   "pt": [
+    868,
+    487
+   ],
+   "inside": true,
+   "submitted": true,
+   "ok": true
+  },
+  {
+   "pt": [
+    759,
+    522
+   ],
+   "inside": true,
+   "submitted": true,
+   "ok": true
+  },
+  {
+   "pt": [
+    868,
+    522
+   ],
+   "inside": true,
+   "submitted": true,
+   "ok": true
+  },
+  {
+   "pt": [
+    758,
+    492
+   ],
+   "inside": false,
+   "submitted": false,
+   "ok": true
+  },
+  {
+   "pt": [
+    869,
+    492
+   ],
+   "inside": false,
+   "submitted": false,
+   "ok": true
+  },
+  {
+   "pt": [
+    764,
+    486
+   ],
+   "inside": false,
+   "submitted": false,
+   "ok": true
+  },
+  {
+   "pt": [
+    764,
+    523
+   ],
+   "inside": false,
+   "submitted": false,
+   "ok": true
+  }
+ ],
+ "double_click": {
+  "atomic": {
+   "runs": 20,
+   "dblclick_events": 0
+  },
+  "hold20_gap": {
+   "runs": 20,
+   "dblclick_events": 20
+  }
+ },
+ "single_click_chaining": {
+  "gap_100ms": {
+   "pairs": 5,
+   "second_click_was_dblclick": 5,
+   "submits_of_10_clicks": 10,
+   "kinds": [
+    [
+     "press",
+     "dblclick"
+    ],
+    [
+     "press",
+     "dblclick"
+    ],
+    [
+     "press",
+     "dblclick"
+    ],
+    [
+     "press",
+     "dblclick"
+    ],
+    [
+     "press",
+     "dblclick"
+    ]
+   ]
+  },
+  "gap_dblclicktime_plus_100ms": {
+   "pairs": 5,
+   "second_click_was_dblclick": 0,
+   "submits_of_10_clicks": 10,
+   "kinds": [
+    [
+     "press",
+     "press"
+    ],
+    [
+     "press",
+     "press"
+    ],
+    [
+     "press",
+     "press"
+    ],
+    [
+     "press",
+     "press"
+    ],
+    [
+     "press",
+     "press"
+    ]
+   ]
+  }
+ },
+ "click_to_focus_ms": {
+  "n": 10,
+  "median": 3.07,
+  "max": 6.08
+ },
+ "restore_cursor_option": {
+  "before": [
+   582,
+   504
+  ],
+  "after": [
+   582,
+   504
+  ]
+ },
+ "skips": [],
+ "gaps": [
+  {
+   "user_active": false,
+   "fg_ok": true
+  },
+  {
+   "user_active": false,
+   "fg_ok": true
+  },
+  {
+   "user_active": false,
+   "fg_ok": true
+  }
+ ],
+ "cursor_restored_end": true
+}

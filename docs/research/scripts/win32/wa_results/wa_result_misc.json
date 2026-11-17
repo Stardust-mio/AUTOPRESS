@@ -1,0 +1,147 @@
+{
+ "started": "20261117_135936",
+ "sizes": {
+  "INPUT": 40,
+  "MOUSEINPUT": 32,
+  "KEYBDINPUT": 24,
+  "HARDWAREINPUT": 8
+ },
+ "sendinput_cbsize": {
+  "28": [
+   0,
+   87
+  ],
+  "32": [
+   0,
+   87
+  ],
+  "36": [
+   0,
+   87
+  ],
+  "40": [
+   1,
+   0
+  ],
+  "44": [
+   0,
+   87
+  ]
+ },
+ "globallock_restype": {
+  "correct": "0x2770d688780",
+  "default_c_int": "0xd688780",
+  "truncated": true
+ },
+ "globalalloc_default_handle": "0xf170008",
+ "contention": {
+  "null": {
+   "holder": "held",
+   "holder_open_window_nonzero": false,
+   "first_open_ok": true,
+   "first_err": 0,
+   "attempts_with_10ms_retry": 1,
+   "waited_ms": 1,
+   "readback_ok": true
+  },
+  "hwnd": {
+   "holder": "held",
+   "holder_open_window_nonzero": true,
+   "first_open_ok": false,
+   "first_err": 5,
+   "attempts_with_10ms_retry": 40,
+   "waited_ms": 422,
+   "readback_ok": true
+  }
+ },
+ "openclipboard_null": {
+  "setclipboarddata_ok": true,
+  "err": 0,
+  "readback": true
+ },
+ "privacy_formats_on_clipboard": [
+  "ExcludeClipboardContentFromMonitorProcessing",
+  "CanIncludeInClipboardHistory",
+  "CanUploadToCloudClipboard"
+ ],
+ "clipboard_restored": true,
+ "clipboard_restored_byte_exact": true,
+ "clipboard_formats": [
+  [
+   49341,
+   "PNG",
+   413191
+  ],
+  [
+   17,
+   "",
+   1832724
+  ],
+  [
+   49378,
+   "HTML Format",
+   199
+  ],
+  [
+   8,
+   "",
+   1832640
+  ]
+ ],
+ "mapvk_vsc_ex": {
+  "LEFT": "0x4b",
+  "DELETE": "0x53",
+  "HOME": "0x47",
+  "RCONTROL": "0xe01d",
+  "RMENU": "0xe038",
+  "RETURN": "0x1c",
+  "A": "0x1e",
+  "LSHIFT": "0x2a",
+  "DIVIDE": "0xe035",
+  "NUMLOCK": "0x45"
+ },
+ "mapvk_vsc_plain_LEFT": "0x4b",
+ "caps_affects_vs_isalpha_mismatches": [],
+ "layout": "0x4040404",
+ "lastinput_lag_after_sendinput_ms": [
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0
+ ],
+ "ime_detach": {
+  "qtattr": {
+   "in_process_state": {
+    "open": true,
+    "conv": 1
+   },
+   "xproc_query": {
+    "open": 1,
+    "conv": 1
+   }
+  },
+  "off": {
+   "in_process_state": {
+    "open": false,
+    "conv": 0
+   },
+   "xproc_query": null
+  },
+  "on": {
+   "in_process_state": {
+    "open": true,
+    "conv": 1
+   },
+   "xproc_query": {
+    "open": 1,
+    "conv": 1
+   }
+  }
+ }
+}

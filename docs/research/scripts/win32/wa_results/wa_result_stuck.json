@@ -1,0 +1,253 @@
+{
+ "started": "20261117_140416",
+ "down_at_start": [],
+ "release": [
+  {
+   "pressed": [
+    "LSHIFT"
+   ],
+   "down_before": [
+    "LSHIFT",
+    "SHIFT"
+   ],
+   "released": [
+    "0xa0"
+   ],
+   "down_after": []
+  },
+  {
+   "pressed": [
+    "LCTRL"
+   ],
+   "down_before": [
+    "LCTRL",
+    "CTRL"
+   ],
+   "released": [
+    "0xa2"
+   ],
+   "down_after": []
+  },
+  {
+   "pressed": [
+    "LSHIFT",
+    "LCTRL"
+   ],
+   "down_before": [
+    "LSHIFT",
+    "LCTRL",
+    "SHIFT",
+    "CTRL"
+   ],
+   "released": [
+    "0xa0",
+    "0xa2"
+   ],
+   "down_after": []
+  },
+  {
+   "pressed": [
+    "RSHIFT",
+    "RCTRL"
+   ],
+   "down_before": [
+    "RSHIFT",
+    "RCTRL",
+    "SHIFT",
+    "CTRL"
+   ],
+   "released": [
+    "0xa1",
+    "0xa3"
+   ],
+   "down_after": []
+  },
+  {
+   "pressed": [
+    "LSHIFT",
+    "RCTRL"
+   ],
+   "down_before": [
+    "LSHIFT",
+    "RCTRL",
+    "SHIFT",
+    "CTRL"
+   ],
+   "released": [
+    "0xa0",
+    "0xa3"
+   ],
+   "down_after": []
+  }
+ ],
+ "kill": {
+  "split": {
+   "kills": 10,
+   "shift_stuck": 8,
+   "all_clear_after_release": true,
+   "rows": [
+    {
+     "stuck_after_kill": [
+      "LSHIFT",
+      "SHIFT"
+     ],
+     "released": [
+      "0xa0"
+     ],
+     "down_after_release": []
+    },
+    {
+     "stuck_after_kill": [
+      "LSHIFT",
+      "SHIFT"
+     ],
+     "released": [
+      "0xa0"
+     ],
+     "down_after_release": []
+    },
+    {
+     "stuck_after_kill": [
+      "LSHIFT",
+      "SHIFT"
+     ],
+     "released": [
+      "0xa0"
+     ],
+     "down_after_release": []
+    },
+    {
+     "stuck_after_kill": [
+      "LSHIFT",
+      "SHIFT"
+     ],
+     "released": [
+      "0xa0"
+     ],
+     "down_after_release": []
+    },
+    {
+     "stuck_after_kill": [],
+     "released": [],
+     "down_after_release": []
+    },
+    {
+     "stuck_after_kill": [
+      "LSHIFT",
+      "SHIFT"
+     ],
+     "released": [
+      "0xa0"
+     ],
+     "down_after_release": []
+    },
+    {
+     "stuck_after_kill": [
+      "LSHIFT",
+      "SHIFT"
+     ],
+     "released": [
+      "0xa0"
+     ],
+     "down_after_release": []
+    },
+    {
+     "stuck_after_kill": [
+      "LSHIFT",
+      "SHIFT"
+     ],
+     "released": [
+      "0xa0"
+     ],
+     "down_after_release": []
+    },
+    {
+     "stuck_after_kill": [],
+     "released": [],
+     "down_after_release": []
+    },
+    {
+     "stuck_after_kill": [
+      "LSHIFT",
+      "SHIFT"
+     ],
+     "released": [
+      "0xa0"
+     ],
+     "down_after_release": []
+    }
+   ]
+  },
+  "atomic": {
+   "kills": 10,
+   "shift_stuck": 0,
+   "all_clear_after_release": true,
+   "rows": [
+    {
+     "stuck_after_kill": [],
+     "released": [],
+     "down_after_release": []
+    },
+    {
+     "stuck_after_kill": [],
+     "released": [],
+     "down_after_release": []
+    },
+    {
+     "stuck_after_kill": [],
+     "released": [],
+     "down_after_release": []
+    },
+    {
+     "stuck_after_kill": [],
+     "released": [],
+     "down_after_release": []
+    },
+    {
+     "stuck_after_kill": [],
+     "released": [],
+     "down_after_release": []
+    },
+    {
+     "stuck_after_kill": [],
+     "released": [],
+     "down_after_release": []
+    },
+    {
+     "stuck_after_kill": [],
+     "released": [],
+     "down_after_release": []
+    },
+    {
+     "stuck_after_kill": [],
+     "released": [],
+     "down_after_release": []
+    },
+    {
+     "stuck_after_kill": [],
+     "released": [],
+     "down_after_release": []
+    },
+    {
+     "stuck_after_kill": [],
+     "released": [],
+     "down_after_release": []
+    }
+   ]
+  }
+ },
+ "ensure_fg": {
+  "ok": true,
+  "method": "already",
+  "tries": 0
+ },
+ "skips": [],
+ "gaps": [
+  {
+   "user_active": false,
+   "fg_ok": true
+  }
+ ],
+ "final_release": [],
+ "down_at_end": []
+}

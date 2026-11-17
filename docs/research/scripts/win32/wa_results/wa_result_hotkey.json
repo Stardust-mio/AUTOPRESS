@@ -1,0 +1,179 @@
+{
+ "started": "20261117_140508",
+ "steps": {
+  "basic_nativeevent": {
+   "injected": 5,
+   "received": 5,
+   "via": [
+    "nativeEvent:windows_generic_MSG"
+   ],
+   "lparam_mods_vk": [
+    [
+     6,
+     120
+    ]
+   ],
+   "target_saw_F9": [],
+   "target_saw_modifiers": [
+    [
+     "down",
+     16
+    ],
+    [
+     "down",
+     17
+    ],
+    [
+     "up",
+     16
+    ],
+    [
+     "up",
+     17
+    ]
+   ]
+  },
+  "autorepeat_norepeat": {
+   "keydowns": 6,
+   "received": 1
+  },
+  "dup_other_process": {
+   "hwnd": 28316106,
+   "pid": 17548,
+   "mode": "nativeevent",
+   "ok": false,
+   "err": 1409,
+   "dup_same_process_ok": false,
+   "dup_err": 1409,
+   "mods": 16390,
+   "vk": 120,
+   "hwnd_registered": 28316106
+  },
+  "H1_unregister": [
+   {
+    "t_ns": 2803099964000400,
+    "ev": "unregister",
+    "ok": true,
+    "err": 1409
+   }
+  ],
+  "register_after_close": {
+   "hwnd": 41291326,
+   "pid": 41676,
+   "mode": "filter",
+   "ok": true,
+   "err": 0,
+   "dup_same_process_ok": false,
+   "dup_err": 1409,
+   "mods": 6,
+   "vk": 120,
+   "hwnd_registered": 41291326
+  },
+  "filter_window_hotkey": {
+   "injected": 3,
+   "sightings": 6,
+   "via": [
+    "filter:windows_generic_MSG",
+    "filter:windows_generic_MSG",
+    "filter:windows_generic_MSG",
+    "filter:windows_generic_MSG",
+    "filter:windows_generic_MSG",
+    "filter:windows_generic_MSG"
+   ],
+   "msg_hwnd_nonzero": true
+  },
+  "autorepeat_without_norepeat": {
+   "keydowns": 6,
+   "sightings": 12,
+   "dispatcher_sightings": 0
+  },
+  "filter_window_hotkey_consume": {
+   "injected": 3,
+   "sightings": 3
+  },
+  "thread_register": {
+   "hwnd": 28447178,
+   "pid": 26496,
+   "mode": "filter_thread",
+   "ok": true,
+   "err": 0,
+   "dup_same_process_ok": false,
+   "dup_err": 1409,
+   "mods": 16390,
+   "vk": 120,
+   "hwnd_registered": null
+  },
+  "filter_thread_hotkey": {
+   "injected": 3,
+   "sightings": 3,
+   "via": [
+    "filter:windows_generic_MSG"
+   ],
+   "msg_hwnd": [
+    0
+   ]
+  },
+  "activate_on_hotkey": [
+   {
+    "why": "startup",
+    "ret": true,
+    "fg_is_me": true
+   },
+   {
+    "why": "control_postmessage",
+    "ret": false,
+    "fg_is_me": false
+   },
+   {
+    "why": "hotkey",
+    "ret": true,
+    "fg_is_me": true
+   }
+  ]
+ },
+ "H1_register": {
+  "hwnd": 41225790,
+  "pid": 29188,
+  "mode": "nativeevent",
+  "ok": true,
+  "err": 0,
+  "dup_same_process_ok": false,
+  "dup_err": 1409,
+  "mods": 16390,
+  "vk": 120,
+  "hwnd_registered": 41225790
+ },
+ "ensure_fg": {
+  "ok": true,
+  "method": "already",
+  "tries": 0
+ },
+ "ensure_fg2": {
+  "ok": true,
+  "method": "already",
+  "tries": 0
+ },
+ "ensure_fg3": {
+  "ok": true,
+  "method": "plain",
+  "tries": 1
+ },
+ "ensure_fg4": {
+  "ok": true,
+  "method": "already",
+  "tries": 0
+ },
+ "ensure_fg5": {
+  "ok": true,
+  "method": "plain",
+  "tries": 1
+ },
+ "skips": [],
+ "gaps": [],
+ "released_modifiers": [],
+ "keys_down_after": {
+  "0x10": false,
+  "0x11": false,
+  "0x78": false
+ }
+}

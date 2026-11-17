@@ -1,0 +1,39 @@
+{
+ "hwnd": 17830036,
+ "pid": 44672,
+ "tid": 17380,
+ "title": "WA Target misc_ime_qtattr 44916",
+ "dpr": 1.0,
+ "window_rect": [
+  292,
+  269,
+  788,
+  478
+ ],
+ "client_rect": [
+  300,
+  300,
+  780,
+  470
+ ],
+ "edit_rect": [
+  311,
+  374,
+  653,
+  395
+ ],
+ "submit_rect": [
+  659,
+  367,
+  769,
+  403
+ ],
+ "submit_logical_global": [
+  659,
+  367,
+  110,
+  36
+ ],
+ "screen": "MSI MP251W E2 (1)",
+ "t_ns": 2802766630652200
+}

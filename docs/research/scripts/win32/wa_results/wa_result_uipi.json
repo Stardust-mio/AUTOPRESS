@@ -1,0 +1,33 @@
+{
+ "started": "20261117_134922",
+ "ensure_fg_low_il": {
+  "ok": true,
+  "method": "already",
+  "tries": 0
+ },
+ "low_il": {
+  "guard_ok": true,
+  "sendinput_ret": 8,
+  "sendinput_err": 0,
+  "postmessage_ok": false,
+  "postmessage_err": 5,
+  "raw": 20971537,
+  "target_text_after": "",
+  "target_key_events": 0
+ },
+ "ensure_fg_medium_il_control": {
+  "ok": true,
+  "method": "already",
+  "tries": 0
+ },
+ "medium_il_control": {
+  "guard_ok": true,
+  "sendinput_ret": 8,
+  "sendinput_err": 0,
+  "postmessage_ok": true,
+  "postmessage_err": 0,
+  "raw": 2097169,
+  "target_text_after": "PUIPI",
+  "target_key_events": 20
+ }
+}
