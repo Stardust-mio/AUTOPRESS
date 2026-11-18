@@ -21,7 +21,7 @@ from PyQt6.QtWidgets import QApplication, QHBoxLayout, QMainWindow, QStackedWidg
 from .. import APP_NAME, paths
 from ..context import PAGE_IDS, AppContext
 from ..i18n import format_count, tr
-from ..models import CodeStatus, Profile, RunState, ThemeName
+from ..models import Profile, RunState, ThemeName
 from . import icons, theme
 from .shell_common import change_theme, failsafe_corner_text, open_folder
 from .shell_sidebar import Sidebar
@@ -266,13 +266,15 @@ class MainWindow(QMainWindow):
             pass
 
     def _refresh_badges(self) -> None:
-        """Sidebar count pills (SPEC 6.3): 序號 = codes still to do (runnable + review), 設定檔 and
-        紀錄 = totals. Each pill's tooltip says what its number counts (UI review U43)."""
+        """Sidebar count pills (SPEC 6.3): 序號 = codes still to do (codes_model.TODO_STATUSES: not
+        finished - runnable, the 兌換中 code of a run and review - the same rule as the Codes header's
+        「待處理 n」), 設定檔 and 紀錄 = totals. Each pill's tooltip says what its number counts (U43)."""
         ctx = self.ctx
         try:
+            from .codes_model import TODO_STATUSES  # here: a broken Codes module costs only this pill
+
             counts = ctx.queue.counts()
-            todo = [(s, int(counts.get(s, 0) or 0))
-                    for s in (CodeStatus.PENDING, CodeStatus.COOLDOWN, CodeStatus.REVIEW)]
+            todo = [(s, int(counts.get(s, 0) or 0)) for s in TODO_STATUSES]
             n = sum(c for _s, c in todo)
             tip = ""
             if n:

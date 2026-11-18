@@ -102,6 +102,8 @@ def keep_binary(entry, imported=frozenset()):
 
 def keep_data(entry):
     dest = _dest(entry)
+    if ".bak-" in dest.rsplit("/", 1)[-1]:  # local backup copies (<file>.bak-<date>) are never shipped
+        return False
     if dest.startswith(QT_PREFIX + "translations/"):
         return dest.rsplit("/", 1)[-1] in {t.lower() for t in KEEP_QT_TRANSLATIONS}
     return True

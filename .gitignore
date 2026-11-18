@@ -30,3 +30,6 @@ desktop.ini
 
 # User-guide screenshots before tools/screenshots.py adds the callouts (G8; only annotated images are committed)
 /docs/images/raw/
+
+# Crash dumps of MSYS / Git Bash tools
+*.stackdump

@@ -1,3 +1,5 @@
+> **已由正式版的使用說明 [docs/user_guide.md](../user_guide.md) 取代**（實際程式畫面）；這份設計預覽只留作紀錄。
+
 # AutoPress 設計預覽
 
 > [!IMPORTANT]

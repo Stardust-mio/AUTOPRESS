@@ -417,6 +417,9 @@ class RunPage(QWidget):
             return False
 
     def test_one(self) -> bool:
+        """「測試一筆」: the first pending code of the game, ticked or not - like the Codes page and
+        the pre-flight action. With the page's selection, 「只跑勾選的」 and an unticked first code
+        made the plan empty and the sheet blocked with the misleading "no codes" message."""
         p = self.profile()
         if p is None:
             return False
@@ -424,7 +427,7 @@ class RunPage(QWidget):
         if cid is None:
             self.ctx.notify(tr("沒有可以測試的序號。", "There is no code to test."), "info")
             return False
-        return bool(self.run_flow().begin(p, self.selection_value(), code_ids=[cid], mode=PlanMode.TEST_ONE))
+        return bool(self.run_flow().begin(p, RunSelection.UNFINISHED, code_ids=[cid], mode=PlanMode.TEST_ONE))
 
     def preview(self) -> None:
         p = self.profile()

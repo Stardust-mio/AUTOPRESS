@@ -70,6 +70,11 @@ FILTER_STATUSES: dict[str, frozenset[CodeStatus]] = {
     "failed": frozenset({CodeStatus.FAILED, CodeStatus.INVALID, CodeStatus.EXPIRED}),
     "skipped": frozenset({CodeStatus.SKIPPED}),
 }
+TODO_STATUSES: tuple[CodeStatus, ...] = (CodeStatus.PENDING, CodeStatus.RUNNING, CodeStatus.COOLDOWN, CodeStatus.REVIEW)
+"""What 「待處理」 counts - the Codes header and the sidebar's 序號 pill with its tooltip, which lists
+these parts in this order (UI review U43): every code that is not finished, i.e. the 待兌換 segment
+(PENDING, COOLDOWN and the RUNNING code of a run) plus the 需確認 segment, so during a run too the
+header's number is the sum of those two segment labels."""
 FILTER_LABELS: dict[str, T] = {
     "all": T("全部", "All"), "pending": T("待兌換", "Pending"), "review": T("需確認", "Review"),
     "done": T("已完成", "Done"), "failed": T("失敗", "Failed"), "skipped": T("已略過", "Skipped"),

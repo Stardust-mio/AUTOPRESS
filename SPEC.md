@@ -879,7 +879,7 @@ file; never `tempfile.mkstemp`, which loops for a long time in ACL-denied folder
 (`paths.resource_path`, `paths.templates_dir`).
 
 ### 5.2 Profile
-`Profile` = schema_version, id, name, game (history key `game_key()` = "game:<squashed game>" or "profile:<id>"),
+`Profile` = schema_version, id, name, game (history key `game_key()` = `"game:<squashed game>"` or `"profile:<id>"`),
 description, author, `target: TargetMatch` (exe basename case-insensitive, title contains/exact/regex/any, class
 exact, allow_same_process), `suggested_exe` (import hint only), `coord_mode` (auto/offset/ratio),
 `code_format: CodeFormat`, `steps: list[Step]`, `keywords: KeywordConfig`, `policy: RunPolicy` (interval 6-8 s,
@@ -1061,8 +1061,9 @@ with it, and two lines are balanced. QSS hooks: `QScrollArea[frameRole="inset"]`
 `QAbstractScrollArea::corner`.
 
 ### 6.3 Shell (G5)
-Sidebar: logo + "AutoPress", nav 序號 Codes (count pill = runnable + review), 設定檔 Profiles, 執行 Run, 紀錄 History
-(each pill's tooltip says what it counts: 「待處理的序號 {n} 筆：待兌換 {a}、冷卻中 {b}、需確認 {c}」 (zero parts left out),
+Sidebar: logo + "AutoPress", nav 序號 Codes (count pill = codes still to do in the whole queue: runnable + the 兌換中
+code of a run + review, `codes_model.TODO_STATUSES`), 設定檔 Profiles, 執行 Run, 紀錄 History
+(each pill's tooltip says what it counts: 「待處理的序號 {n} 筆：待兌換 {a}、兌換中 {r}、冷卻中 {b}、需確認 {c}」 (zero parts left out),
 「共 {n} 個設定檔」, 「共 {n} 筆紀錄」);
 bottom 設定 Settings, 說明 Help (active item: nav_active fill + 3 px accent bar). Pages in a QStackedWidget; a page
 whose constructor raises NotImplementedError becomes a 「尚未實作」 placeholder. Status bar (always visible, keys of
@@ -1077,8 +1078,10 @@ Toasts: top-right, 4 s, max 3.
 Main window minimum 1100x700 logical, default 1280x800, geometry remembered.
 
 ### 6.4 Pages
-1. **序號 Codes (G6)** - header: title + 「{n} 筆 · 待處理 {t} · 來自 {s} 個來源」 (待處理 = 待兌換 + 冷卻中 + 需確認 of
-   the shown games: what the sidebar pill counts, in words, U43) + 「已去除 {d} 筆重複」 note, active-profile combo (name only,
+1. **序號 Codes (G6)** - header: title + 「{n} 筆 · 待處理 {t} · 來自 {s} 個來源」 (待處理 = 待兌換 + 兌換中 + 冷卻中 +
+   需確認 of the shown games, `codes_model.TODO_STATUSES`: the 待兌換 and 需確認 filter segments, so the number equals the
+   sum of those two segment labels also while a code is 兌換中; the statuses the sidebar pill counts, in words, U43) +
+   「已去除 {d} 筆重複」 note, active-profile combo (name only,
    tooltip 「遊戲：{game}」), buttons 測試一筆 (the Run page's label; selected or first runnable code,
    PlanMode.TEST_ONE) and primary 開始兌換 (both through a page-owned `RunFlow` created
    lazily on the first click - while G7's RunFlow or `overlays.pick` raise NotImplementedError the click shows a
@@ -1126,11 +1129,13 @@ Main window minimum 1100x700 logical, default 1280x800, geometry remembered.
    and run-rules cards share one label column; 「● 使用中」 is green; 說明 and 作者 have placeholders; 「長度」 has the
    hint 「不含分隔符號」 and the format card shows the allowed characters in words (a preset shows only the words, e.g.
    「英文字母與數字」; the editable rule such as "A-Za-z0-9", with the words under it, appears with 「自訂」); built-in
-   template step names fit the step list at the default window (「框出結果訊息的範圍」, 「關閉結果（若有）」); the step list is 300 px (down to
+   template step names fit the step list at the default window (「框出結果訊息的範圍」, 「關閉結果（若有）」); a step that misses a
+   required setting gets a painted 8 px dot in the theme's `error` colour leading its summary line (before e.g. 尚未設定位置),
+   so its name keeps the full column width; the step list is 300 px (down to
    240); point / region fields show the value on its own line with the buttons below; narrow forms put fields
    under their labels; the editor never scrolls sideways (horizontal bar off; measured zh-TW and English, 100-150 %).
    The empty profile list says 「還沒有設定檔」 with a hint to the templates and 匯入. Code format summary everywhere
-   (gallery, import card): 「<format> · <characters in words> · <length>」 (+ 「· 分段 5-5-5」). Buttons: 預覽點位 (PreviewOverlay
+   (gallery, import card): 「`<format> · <characters in words> · <length>`」 (+ 「· 分段 5-5-5」). Buttons: 預覽點位 (PreviewOverlay
    6 s), 測試此步驟 (dry run by default; a real test asks the first time 「會真的對目標視窗輸入」, warns when the step
    is at or after `first_submit_index()` 「這一步會送出測試序號「{code}」；有些服務會把它算成一次錯誤嘗試」, then shows
    the countdown, registers the stop hotkey for the test and offers 停止測試 -> `session.stop()`), 儲存 (dirty marker;
@@ -1161,10 +1166,15 @@ Main window minimum 1100x700 logical, default 1280x800, geometry remembered.
    character names are not shared).
 3. **執行 Run (G7)** - active profile, target window (change / refresh), selection 全部未完成 / 只跑勾選的 with the
    count (codes of the profile's game), preflight list (icon, message, hint, action button: restart_admin ->
-   `elevation.restart_as_admin()` + quit (the prompt says drag-and-drop from Explorer will not work while elevated),
+   `run_actions.restart_as_admin_flow` (also the window picker's button): confirm (the prompt says drag-and-drop from
+   Explorer will not work while elevated), then, when the Profiles page has unsaved edits, 「未儲存的變更」 儲存 / 不儲存 /
+   取消 BEFORE the elevated instance starts (it waits only for the `--wait-lock` hand-over; 取消 or a failed save starts
+   nothing and keeps the edits; 不儲存 discards them only once the restart started; a declined UAC prompt keeps them,
+   unsaved, with 「沒有重新啟動（可能取消了權限提示）。」), then `elevation.restart_as_admin()` + quit,
    pick_window, preview, open_profile, wait_ocr, assign_codes -> `queue.assign_game` of the unassigned codes to the
    profile's game, test_one -> 測試一筆, realign -> `ProfilesPage.start_wizard(id, realign=True)`), buttons 開始兌換
-   (primary), 測試一筆 (first runnable or selected code, PlanMode.TEST_ONE), 預覽點位. Profile combo: the name only,
+   (primary), 測試一筆 (the first runnable code of the game with RunSelection.UNFINISHED - ticked or not, whatever the
+   page's selection - and PlanMode.TEST_ONE, like the Codes page without a selected code), 預覽點位. Profile combo: the name only,
    tooltip 「遊戲：{game}」. Target line 「已找到：{title}」 / 「找不到目標視窗：{target}」 (elided; refreshed when the page
    is shown and synced with every preflight report). Preflight rows (here and in the sheet) have level icons ✕ /
    triangle / i and are at least button height; the sheet is as tall as its content (the list scrolls beyond 60 % of
@@ -1209,8 +1219,8 @@ Main window minimum 1100x700 logical, default 1280x800, geometry remembered.
    capture fields with conflict test via a temporary `GlobalHotkeys.register` and immediate unregister), 輸入
    (default typing mode, delays), 文字辨識 (state, error, threads, warm-up, review threshold, 重新啟動引擎 - changes
    apply through `ctx.ocr.restart(settings.ocr)`), 紀錄 (history skip + statuses, evidence keep days, 清除紀錄),
-   資料 (data folder path + 開啟資料夾, portable indicator, fallback note), 關於 (version, licenses, GitHub link
-   placeholder).
+   資料 (data folder path + 開啟資料夾, portable indicator, fallback note), 關於 (version, licenses, the repository
+   URL `settings_page.REPO_URL` as selectable text: 「原始碼與新版下載：…」 - AutoPress itself never opens it).
 6. **說明 Help (G5)** - the 本頁內容 table of contents marks the section in view (follows scrolling; a clicked entry
    stays marked until the page scrolls again); sections: 這是什麼 (says 序號 throughout) · 安全守則 (only your codes; official web pages are safer; import profiles
    only from people you trust - a profile is a list of keystrokes; chat-command redemption (`/redeem`) posts the
@@ -1422,6 +1432,11 @@ README and user guide open with 「下載後先解壓縮」, the SmartScreen ste
 仍要執行) and what to do on an antivirus warning; the README's English section has a short quick start. Reference
 setup: an earlier PyInstaller project of the maintainer (not in the repo; its spec, build.ps1 and licenses/) - read only. Measured at integration
 (2026-11-17): 256.6 MB unpacked, zip 111.4 MB (cv2.pyd 82 MB, onnxruntime 45 MB, PyQt6 39 MB, OCR models 31 MB).
+Release build 0.1.0 (2026-11-18, with the guide and its images): app folder 256.6 MB, extracted zip 259.1 MB, zip
+112.8 MB. The README quotes the zip size as build.ps1 prints it and the extracted size as the sum of the zip members'
+uncompressed sizes (the app folder build.ps1 prints plus README, CHANGELOG, licences, the guide and its images), both
+in MiB with one decimal (「約 112.8 MB」 and 「約 259.1 MB」, in 系統需求, 下載 and the English Download line); after
+each release build, update both numbers there and here.
 
 ### 10.2 Licences (G8)
 AutoPress is GPL-3.0 (PyQt6 is GPL). Ship: LICENSE (GPL-3.0 text), THIRD-PARTY-NOTICES.md and `licenses/` with texts
@@ -1441,24 +1456,47 @@ screenshots of every page at 100/125/150 % in both themes reviewed by a fresh-co
 zip check; the user guide (10.4) checked against the real screens. 4. Fresh-context review of SPEC and requirements
 coverage (table 1.1). 5. User acceptance on a real redeem page / game. 6. The folder is already a git repository
 with a GitHub `origin` remote (2 orchestrator commits): make sure the remote repo `AUTOPRESS` is private, commit and
-push (requirements R6) after the user confirms.
+push (requirements R6) after the user confirms (private during development; for the release it becomes public and
+the zip is published on GitHub Releases, requirements item 7).
 Before the groups start, the orchestrator tells the user what changed against `docs/design-preview/README.md`
 (and marks it there): 條件停止 is not a step type (RunPolicy); the 「校正」 wizard is 「重新對準」 (re-pick every
 position); OCR language is not a setting (one model reads zh/en/ja; Korean unsupported); the 略過清單 is the 已略過
 filter plus history skip; the mini bar avoids click points and OCR regions as promised. Open question for the user
 (PX-21): how other people will get the zip - a private repo cannot serve downloads to "everyone"; G8 writes download
-instructions only after the answer.
+instructions only after the answer. **Answered** (user, 2026-11-17, requirements item 7): the repo becomes public and
+the zip `AutoPress-<version>-win64.zip` is a GitHub Releases asset
+(`https://github.com/Stardust-mio/AUTOPRESS/releases/latest`); the README's 「下載」 section, its English quick start
+and the user guide say so (download, unzip, run `AutoPress.exe`: no install, no admin rights, offline).
 
 ### 10.4 User guide (G8, requirement R7)
 `docs/user_guide.md` (zh-TW; the README's English section links a short English quick start) built from screenshots
 of the REAL program - never `docs/design-preview` or the research prototype PNGs - with demo data only
 (`tests/fakes.py: demo_context()` or a demo data folder, no real codes), captured with `tools/guide_capture.py`
-(8.3). Screens and states: first run (welcome,
+(8.3). Build: `.venv/Scripts/python.exe tools/guide_capture.py docs/images/raw --theme dark --geometry` writes the raw
+PNGs and their geometry JSON (widget rects in PNG pixels: place callouts from these, never by eye) to
+`docs/images/raw/` (git-ignored); then `.venv/Scripts/python.exe tools/screenshots.py build docs/images/shots.json
+--out-dir docs/images` draws the callouts of the manifest `docs/images/shots.json` (per image: source, title, alt,
+callouts with their captions) into `docs/images/<name>.png`. Committed: the annotated PNGs, `readme_main.png` and
+`shots.json`. Screens and states (all captured; `--list` names the 33 screens): first run (welcome,
 empty Codes page), Codes page with codes (review banner, filters, bulk bar), paste dialog, OCR review dialog,
 Profiles page (template gallery, editor, import card), setup wizard steps, Run page (preflight list, running,
-paused with attention), mini bar, History page, Settings, Help. Every image gets numbered callouts drawn by
-`tools/screenshots.py` and one caption per number below the image. Images live in `docs/images/` and are referenced
-with relative paths and plain Markdown (GitHub renders it; no HTML GitHub strips). README links the guide.
+paused with attention), mini bar, History page, Settings, Help. The guide (orchestrator, 2026-11-18; repair round 1
+of its review) follows the first-run order - a 「第一次使用」 checklist, then welcome, profiles and the setup wizard,
+codes, run, history / settings / help, troubleshooting, data folder, everyday questions - with 22 annotated
+dark-theme screens at 100 %: welcome, the first-start main window (sidebar, empty Codes page); template gallery,
+window picker, wizard position / region picker / close choice / test screens, Profiles page, step editor, import
+card; Codes page, paste dialog, OCR review; Run page, pre-flight sheet, mini bar running / paused / cool-down, paused
+with attention, run summary; History, Settings, Help. Only two states are described in text, without a picture: the
+wizard's title-keyword dialog (not among the captured screens) and the start countdown (its capture has no widget
+geometry for callouts). The wizard screens are captured from `_wizard_plan` (target already chosen), so they show
+設定精靈 1/4, 3/4 and 4/4 and the window picker has no progress caption; a note at the top of the guide's wizard
+section says so and gives the first-setup numbers (1/5 to 5/5) - change it when the capture plan changes.
+Every image gets numbered callouts drawn by
+`tools/screenshots.py` and one caption per number below the image; the guide's captions are the manifest's texts.
+Images live in `docs/images/` and are referenced
+with relative paths and plain Markdown (GitHub renders it; no HTML GitHub strips). README links the guide and shows
+`docs/images/readme_main.png` (an unannotated copy of `raw/main_dark_100.png`) plus four of the guide's images, each
+linked to its guide section.
 Integration checks R7: every referenced image exists and comes from the real app of the release build.
 
 ## 11. Unverified decisions and known risks
@@ -1605,4 +1643,6 @@ Every item of `docs/review/spec_critique_tech.md` (T01-T41) and `docs/review/spe
 - G-12 (gate, integration) -> accepted: manual marks (run_id "manual") are not daily-cap attempts; the Codes page is a history writer (5.1, 5.6).
 - G-10, G-13 - G-25 (gate minors) -> deferred to the next iteration unless already covered (G-16 / G-19 / G-12 handled by G1 / G6; G-25 FILTERS "done" = success/submitted/used decided by G6); see the integration notes.
 - Group decisions confirmed at integration: version line in the sidebar footer (G5, 6.3); bulk actions on selected rows (G6, 6.4.1); only_new_text kept as the safe default (G4, 11.12); 7.1 texts that the table lacks (wait_text timeout, points_missing, no_codes, target_is_self, target_multiple, target_minimized, fast_interval, OCR disabled, target re-bind) live in runner/messages.py with English pairs.
-- UI polish + real-input fix (orchestrator, 2026-11-17/18) -> accepted: a fresh-context review of the screenshots of all 33 screens (both themes at 100 %, spot checks at 150 %) found 43 issues (P1 6 / P2 19 / P3 18); seven fix groups (codes, shell, profiles, run, other, capture, win32) fixed them in parallel, each with tests that fail on the old code (tests/test_ui_polish_*.py, tests/test_guide_capture.py), and the integration applied their cross-file items (one result per code after a decision: worker counters + RunSession re-emits code_finished; Codes combo locked during a run; English Profiles editor fits the smallest window; status-bar target looked up when a page is shown; quoted button labels; two template descriptions trimmed so the gallery has no one-word last lines). The UI changes are in 6.2-6.4 and 7.1; README / guide screenshots come from `tools/guide_capture.py` (8.3, 10.4). Real-input fix (commit "fix(win32): keep Unicode text behind earlier keys in IME targets"): UNICODE text waits TEXT_AFTER_KEYS_SETTLE_S after our keys in IME targets (2.7.10); its limit for stalled targets is in 11.11 and the CHANGELOG; the real-input fixture now restores only changed desktop state, and the new IME test runs at the next real-input gate. Repair round 1 (after a fresh-context verification of the new screenshots): a marked decision is counted also when the run is then stopped, a 冷卻中 choice is one result on every view, and a result marked by hand is not a passed 測試一筆 (a normal run with a read result marks a never-tested profile; the untested warning offers 測試一筆 only with a code) (2.2, 2.4); greyed selection segment, opaque countdown card with the arrow ending at the corner ring, picker badge outside the target and a visible magnifier reticle, framed natural-size evidence on the decision card, the info line on the chips row, quoted terms kept on one line, history columns fitted to their entries (6.2-6.4); the capture's demo profile carries the web template's step names and a passed test, the countdown backdrop moves the browser off the failsafe corner, and the capturing process's elevation never reaches a picture (10.4). Repair round 2 (after the second verification): built-in template step names shortened so they fit the step list (「框出結果訊息的範圍」, 「關閉結果（若有）」, also the wizard's close steps) and an untitled step's wizard position says what to pick (6.4.2); the gallery's meta line wraps only between its parts (`widgets.SeparatedLabel`) and two descriptions were reworded so no card ends on a one-word line (6.2); one disabled look for every filled button (6.2); a preset format shows its allowed characters in words only (6.4.2); the Codes header names the sidebar pill's number as 「待處理 n」 (6.4.1); the mini bar is 720 px wide in English and its chips fall back to counts when they leave no room for the wait / pause text (6.4.3); the restart flow's own Save / Discard question and a normal run marking a never-tested profile were removed again as beyond the listed issues (2.4, 7.1); capture: no word-like row in the paste text, the sheet stages a resized browser instead of an untested profile, evidence crops follow the capture scale and run_attention has no page scroll bar (8.3).
+- UI polish + real-input fix (orchestrator, 2026-11-17/18) -> accepted: a fresh-context review of the screenshots of all 33 screens (both themes at 100 %, spot checks at 150 %) found 43 issues (P1 6 / P2 19 / P3 18); seven fix groups (codes, shell, profiles, run, other, capture, win32) fixed them in parallel, each with tests that fail on the old code (tests/test_ui_polish_*.py, tests/test_guide_capture.py), and the integration applied their cross-file items (one result per code after a decision: worker counters + RunSession re-emits code_finished; Codes combo locked during a run; English Profiles editor fits the smallest window; status-bar target looked up when a page is shown; quoted button labels; two template descriptions trimmed so the gallery has no one-word last lines). The UI changes are in 6.2-6.4 and 7.1; README / guide screenshots come from `tools/guide_capture.py` (8.3, 10.4). Real-input fix (commit "fix(win32): keep Unicode text behind earlier keys in IME targets"): UNICODE text waits TEXT_AFTER_KEYS_SETTLE_S after our keys in IME targets (2.7.10); its limit for stalled targets is in 11.11 and the CHANGELOG; the real-input fixture now restores only changed desktop state, and the new IME test runs at the next real-input gate. Repair round 1 (after a fresh-context verification of the new screenshots): a marked decision is counted also when the run is then stopped, a 冷卻中 choice is one result on every view, and a result marked by hand is not a passed 測試一筆 (a normal run with a read result marks a never-tested profile; the untested warning offers 測試一筆 only with a code) (2.2, 2.4); greyed selection segment, opaque countdown card with the arrow ending at the corner ring, picker badge outside the target and a visible magnifier reticle, framed natural-size evidence on the decision card, the info line on the chips row, quoted terms kept on one line, history columns fitted to their entries (6.2-6.4); the capture's demo profile carries the web template's step names and a passed test, the countdown backdrop moves the browser off the failsafe corner, and the capturing process's elevation never reaches a picture (10.4). Repair round 2 (after the second verification): built-in template step names shortened so they fit the step list (「框出結果訊息的範圍」, 「關閉結果（若有）」, also the wizard's close steps) and an untitled step's wizard position says what to pick (6.4.2); the gallery's meta line wraps only between its parts (`widgets.SeparatedLabel`) and two descriptions were reworded so no card ends on a one-word line (6.2); one disabled look for every filled button (6.2); a preset format shows its allowed characters in words only (6.4.2); the Codes header names the sidebar pill's number as 「待處理 n」 (6.4.1); the mini bar is 720 px wide in English and its chips fall back to counts when they leave no room for the wait / pause text (6.4.3); the restart flow's own Save / Discard question and a normal run marking a never-tested profile were removed again as beyond the listed issues (2.4, 7.1; the Save / Discard part is superseded by repair round 3 below); capture: no word-like row in the paste text, the sheet stages a resized browser instead of an untested profile, evidence crops follow the capture scale and run_attention has no page scroll bar (8.3). Repair round 3 (after the third verification; tests/test_ui_polish_repair3.py): the step list's missing-setting dot leads the summary line, so step names keep their width (6.4.2); 待處理 and the 序號 pill count `codes_model.TODO_STATUSES` (待兌換, 兌換中, 冷卻中, 需確認), so during a run the header still equals the 待兌換 + 需確認 segment labels and the pill's tooltip lists 兌換中 (6.3, 6.4.1); the restart-as-administrator flow asks 儲存 / 不儲存 / 取消 for unsaved profile edits BEFORE the elevated instance starts, which supersedes round 2's removal of that question (6.4.3); the in-game template's gallery description reworded so no line break splits a word (6.2).
+- User guide + README (orchestrator, 2026-11-18) -> accepted: a condensed `docs/user_guide.md` of 12 annotated screens built from `docs/images/shots.json` (10.4); the README gets a hero screenshot, four guide images, the 「能用在哪裡」 section the user approved (where it works, limits, tested status; its 「試跑 1 筆」 is the current 「測試一筆」) and the GitHub Releases download (PX-21 answered, 10.3); the design preview is marked as superseded by the guide.
+- Guide review, repair round 1 (orchestrator, 2026-11-18) -> accepted: three fresh-context reviews (accuracy, novice reader, mechanics and privacy) found 42 problems; fixed: 「測試一筆」 on the Run page now always tests the first pending code with RunSelection.UNFINISHED like the Codes page (it used the page's selection, so 「只跑勾選的」 with an unticked first code made an empty plan and a misleading no_codes block; regression test in tests/test_ui_run_page.py); Settings -> 關於 shows the repository URL instead of 「發佈後提供連結」; the guide follows the first-run order with 22 screens (10.4) plus recipes for the step editor (input modes, verify region, button text, chat command, split boxes), the result keywords card, the after-run handling of 需確認 codes, troubleshooting and everyday questions; README and CHANGELOG link SPEC.md by its GitHub URL (build.ps1 does not ship SPEC.md). The CHANGELOG keeps only user-facing items; its process notes (the 33-screen / 43-issue UI review, the 待處理 rule, the restart-as-administrator save question, the 0.2 s IME settle) are recorded above, in 6.3 / 6.4.1 / 6.4.3 and in the input notes. Known product gap left open: `Profile.validate` warns 「沒有「輸入序號」步驟，序號不會被輸入」 also when a 「輸入文字」 step types `{code}` (the chat-command recipe), so that pre-flight warning has to be acknowledged; the guide says so.

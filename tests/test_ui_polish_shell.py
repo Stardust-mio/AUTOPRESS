@@ -150,8 +150,10 @@ def test_target_states_do_not_keep_a_stale_tooltip(window: mw_mod.MainWindow, de
 
 
 def test_sidebar_badges_say_what_they_count(window: mw_mod.MainWindow, demo_ctx: Any, qtbot: Any) -> None:
+    from autopress.ui.codes_model import TODO_STATUSES  # the Codes header's 「待處理」 rule (repair round 3)
+
     counts = demo_ctx.queue.counts()
-    todo = {s: counts.get(s, 0) for s in (CodeStatus.PENDING, CodeStatus.COOLDOWN, CodeStatus.REVIEW)}
+    todo = {s: counts.get(s, 0) for s in TODO_STATUSES}
     n = sum(todo.values())
     assert n and todo[CodeStatus.REVIEW]  # the demo queue has codes to do and codes to review
     codes = window.sidebar.buttons["codes"]

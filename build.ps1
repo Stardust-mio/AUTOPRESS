@@ -35,11 +35,11 @@ $SelfTestTimeoutMs = 180000
 $UnzipNoteName = '請先解壓縮再執行.txt'
 $UnzipNote = @'
 請先把整個壓縮檔解壓縮（在壓縮檔上按右鍵 →「解壓縮全部」），
-再到解壓縮出來的 AutoPress 資料夾裡執行 AutoPress.exe。
+再打開解壓縮出來的 {TopName} 資料夾，執行裡面的 AutoPress.exe。
 直接在壓縮檔裡面按兩下 AutoPress.exe 會無法啟動。
 
 Unzip the whole archive first (right-click the zip -> "Extract All"),
-then run AutoPress.exe inside the extracted AutoPress folder.
+then open the extracted {TopName} folder and run AutoPress.exe in it.
 Starting AutoPress.exe from inside the zip does not work.
 '@
 
@@ -199,7 +199,8 @@ if (Test-Path -LiteralPath $Guide -PathType Leaf) {
 }
 $NotePath = Join-Path $StageRoot $UnzipNoteName
 # UTF-8 with BOM, CRLF: readable in every Notepad version
-[System.IO.File]::WriteAllText($NotePath, ($UnzipNote -replace "`r?`n", "`r`n") + "`r`n", (New-Object System.Text.UTF8Encoding($true)))
+$NoteText = $UnzipNote.Replace('{TopName}', $TopName)
+[System.IO.File]::WriteAllText($NotePath, ($NoteText -replace "`r?`n", "`r`n") + "`r`n", (New-Object System.Text.UTF8Encoding($true)))
 $Zip = Join-Path $DistDir "AutoPress-$Version-win64.zip"
 # Python's zipfile stores forward slashes and UTF-8 names (flag 0x800) for the Chinese file name.
 & $Python -m zipfile -c $Zip $Stage $NotePath

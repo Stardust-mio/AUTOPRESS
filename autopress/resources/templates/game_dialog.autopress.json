@@ -3,7 +3,7 @@
   "id": "template-game-dialog",
   "name": "遊戲內兌換視窗（通用）",
   "game": "",
-  "description": "適用遊戲裡的兌換序號視窗：先在遊戲裡打開兌換視窗再開始。以遊戲模式（按鍵碼）輸入；建議在「輸入序號」步驟設定核對範圍，確認遊戲收到的字正確。建立後在「遊戲」欄填上遊戲名稱。",
+  "description": "適用遊戲裡的兌換序號視窗：開始前先在遊戲裡把它打開。以遊戲模式（按鍵碼）輸入；建議在「輸入序號」步驟設定核對範圍，確認遊戲收到的字正確。建立後，記得在「遊戲」欄填上遊戲名稱。",
   "author": "AutoPress",
   "target": {
     "exe": "",
@@ -122,8 +122,8 @@
     "key": "game_dialog",
     "title_zh": "遊戲內兌換視窗（通用）",
     "title_en": "In-game redeem dialog (generic)",
-    "description_zh": "適用遊戲裡的兌換序號視窗：先在遊戲裡打開兌換視窗再開始。以遊戲模式（按鍵碼）輸入；建議在「輸入序號」步驟設定核對範圍，確認遊戲收到的字正確。建立後在「遊戲」欄填上遊戲名稱。",
-    "description_en": "For a redeem-code dialog inside a game: open the dialog in the game before you start. Types in game mode (key codes); setting a verify region on the \"Type code\" step is recommended to check what the game received. After creating it, enter the game name.",
+    "description_zh": "適用遊戲裡的兌換序號視窗：開始前先在遊戲裡把它打開。以遊戲模式（按鍵碼）輸入；建議在「輸入序號」步驟設定核對範圍，確認遊戲收到的字正確。建立後，記得在「遊戲」欄填上遊戲名稱。",
+    "description_en": "For a redeem-code dialog inside a game: open it in the game before you start. Types in game mode (key codes); a verify region on the \"Type the code\" step is recommended to check what the game received. After creating it, enter the game's name in the Game field.",
     "order": 30
   },
   "created_at": "2026-11-17T00:00:00+08:00",

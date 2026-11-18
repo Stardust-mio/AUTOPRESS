@@ -49,7 +49,16 @@ from .codes_common import (
     game_name,
     skip_note,
 )
-from .codes_model import COL_CODE, COL_MORE, FILTER_LABELS, FILTERS, CodesFilterProxy, CodesTableModel, filter_accepts
+from .codes_model import (
+    COL_CODE,
+    COL_MORE,
+    FILTER_LABELS,
+    FILTERS,
+    TODO_STATUSES,
+    CodesFilterProxy,
+    CodesTableModel,
+    filter_accepts,
+)
 from .codes_paint import code_column_width
 
 log = logging.getLogger(__name__)
@@ -328,9 +337,10 @@ class CodesPage(CodesLayoutMixin, CodesImportsMixin, CodesActionsMixin, QWidget)
             text = tr("尚未新增序號", "No codes yet")
         else:
             parts = [tr("{n} 筆", "{n} codes").format(n=len(scope))]
-            # what the sidebar's 序號 pill counts (待兌換 + 冷卻中 + 需確認), in words next to the total, so
-            # a picture of the page explains the pill without its tooltip (UI review U43)
-            todo = sum(1 for it in scope if it.status in (CodeStatus.PENDING, CodeStatus.COOLDOWN, CodeStatus.REVIEW))
+            # what the sidebar's 序號 pill counts (codes_model.TODO_STATUSES: the 待兌換 and 需確認
+            # segments, so it adds up with their labels also while a code is 兌換中), in words next to
+            # the total, so a picture of the page explains the pill without its tooltip (UI review U43)
+            todo = sum(1 for it in scope if it.status in TODO_STATUSES)
             if todo:
                 parts.append(tr("待處理 {t}", "{t} to do").format(t=todo))
             sources = len({it.source for it in scope})

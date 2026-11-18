@@ -203,11 +203,13 @@ def test_preset_shows_allowed_characters_in_words_only(demo_ctx: Any, qtbot: Any
 def test_codes_header_names_what_the_pill_counts(demo_ctx: Any, qtbot: Any) -> None:
     from autopress.ui.codes_page import CodesPage
 
+    from autopress.ui.codes_model import TODO_STATUSES
+
     page = CodesPage(demo_ctx)
     qtbot.addWidget(page)
     page.refresh()
     counts = demo_ctx.queue.counts()
-    todo = sum(int(counts.get(s, 0) or 0) for s in (CodeStatus.PENDING, CodeStatus.COOLDOWN, CodeStatus.REVIEW))
+    todo = sum(int(counts.get(s, 0) or 0) for s in TODO_STATUSES)  # also 兌換中 (repair round 3)
     assert todo > 0
     assert f" · 待處理 {todo}" in page._subtitle.text()  # the sidebar pill's number, in words (U43)
     i18n.set_language("en")

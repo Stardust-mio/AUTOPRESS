@@ -19,6 +19,7 @@ from autopress.models import (
     PreflightIssue,
     PreflightReport,
     ResultClass,
+    RunSelection,
     RunState,
     RunSummary,
     StepTestResult,
@@ -203,6 +204,31 @@ def test_test_one_uses_the_first_runnable_code(page: RunPage, monkeypatch: pytes
     assert page.test_one()
     build = [a for n, a in ctx.session.calls if n == "build_plan"][-1]
     assert build[2] == (first.id,) and build[3].value == "test_one"
+    ctx.session.stop()
+
+
+def test_test_one_ignores_only_checked_when_the_first_code_is_unticked(page: RunPage,
+                                                                      monkeypatch: pytest.MonkeyPatch) -> None:
+    """「測試一筆」 on the Run page tests the first pending code even under 「只跑勾選的」 with that
+    code unticked (like the Codes page): the page's selection made the plan empty and the sheet
+    blocked with "no codes" although the codes exist."""
+    plans: list[Any] = []
+
+    def sheet(_ctx: Any, _report: Any, plan: Any, _parent: Any) -> str:
+        plans.append(plan)
+        return "start"
+
+    monkeypatch.setattr(run_sheet, "show_preflight_sheet", sheet)
+    ctx = page.ctx
+    first = ctx.queue.runnable(game_key=ctx.active_profile().game_key())[0]
+    ctx.queue.set_checked([first.id], False)
+    page.selection.setCurrentIndex(1)
+    assert page.selection_value() is RunSelection.CHECKED
+    assert page.test_one()
+    build = [a for n, a in ctx.session.calls if n == "build_plan"][-1]
+    assert build[1] is RunSelection.UNFINISHED
+    assert build[2] == (first.id,) and build[3].value == "test_one"
+    assert [i.code_id for i in plans[-1].items] == [first.id]
     ctx.session.stop()
 
 

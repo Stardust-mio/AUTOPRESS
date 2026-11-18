@@ -243,9 +243,9 @@ def test_u24_restart_flow_confirms_then_restarts(page: ProfilesPage, monkeypatch
     dialogs = patch_dialogs(monkeypatch, answers=[False])
     assert run_actions.restart_as_admin_flow(None, ctx) is False  # 取消 at the confirmation
     assert dialogs.confirms and restarts == []
-    # no Save / Discard question of its own (repair round 2: it went beyond the listed issue), as the
-    # pre-flight action before the UI polish
-    page.basics.name.setText("改過但還沒存")
+    # no unsaved edits: no Save / Discard question (with unsaved edits it comes before the elevated
+    # instance starts: tests/test_ui_polish_repair3.py)
+    assert not page.is_dirty()
     asked: list[str] = []
     monkeypatch.setattr(profiles_dialogs, "ask_save_changes", lambda parent, name: asked.append(name) or "cancel")
     dialogs.answers = [True]

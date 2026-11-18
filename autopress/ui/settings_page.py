@@ -42,6 +42,7 @@ log = logging.getLogger(__name__)
 
 HOTKEY_TEST_ACTION = "settings_test"  # never "pause_resume" / "stop": those belong to RunFlow
 OCR_RESTART_DELAY_MS = 600
+REPO_URL = "https://github.com/Stardust-mio/AUTOPRESS"  # 關於: source code and releases (shown as text)
 LANGUAGES = (Language.AUTO, Language.ZH_TW, Language.EN)
 THEMES = (ThemeName.DARK, ThemeName.LIGHT, ThemeName.SYSTEM)
 TYPING_MODES = (TypingMode.UNICODE, TypingMode.CLIPBOARD, TypingMode.VK)
@@ -375,9 +376,11 @@ class SettingsPage(QWidget):
         for text in (tr("以 GPL-3.0 授權釋出的開放原始碼軟體。", "Open-source software under the GPL-3.0 licence."),
                      tr("離線運作：不連網、不檢查更新、沒有遙測；序號只存在這台電腦。",
                         "Works offline: no network, no update checks, no telemetry; codes stay on this PC."),
-                     tr("GitHub：發佈後提供連結。", "GitHub: the link follows with the release.")):
+                     tr(f"原始碼與新版下載：{REPO_URL}", f"Source code and new versions: {REPO_URL}")):
             lb = label(text, "secondary")
             lb.setWordWrap(True)
+            if REPO_URL in text:  # plain text the user can select and copy (AutoPress never opens it)
+                lb.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
             lay.addWidget(lb)
         row = QHBoxLayout()
         row.setSpacing(theme.SP[2])

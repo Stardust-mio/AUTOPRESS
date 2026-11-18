@@ -1,6 +1,7 @@
 # OWNED BY G7
-"""Step list (44 px items: drag handle, StepType.icon, display_title + muted summary, enable
-switch, kebab menu; add / duplicate / delete / move up / move down) and the per-type parameter
+"""Step list (44 px items: drag handle, StepType.icon, display_title + muted summary - led by a red
+dot while required settings are missing, so the dot never narrows the name -, enable switch,
+kebab menu; add / duplicate / delete / move up / move down) and the per-type parameter
 forms. Point/region fields show "未設定" or the value, with 點選位置 / 框選範圍 (overlays.pick
 with the target outline), 清除 and, for points, 對齊 (Anchor: 左上 / 右上 / 左下 / 右下 / 置中).
 The title field edits ``label`` in the zh-TW UI and ``label_en`` in the English UI. click_text
@@ -9,7 +10,8 @@ shows 「找不到時」 (on_not_found: 視為失敗 / 略過這一步); ocr_che
 
 from __future__ import annotations
 
-from PyQt6.QtCore import QSize, Qt, pyqtSignal
+from PyQt6.QtCore import QRectF, QSize, Qt, pyqtSignal
+from PyQt6.QtGui import QPainter, QPaintEvent
 from PyQt6.QtWidgets import (
     QAbstractItemView,
     QHBoxLayout,
@@ -24,7 +26,7 @@ from PyQt6.QtWidgets import (
 from ..context import AppContext
 from ..i18n import tr
 from ..models import IssueLevel, Profile, Step, StepType, clone, make_step
-from . import icons
+from . import icons, theme
 from . import widgets as w
 from .step_forms import StepForm
 
@@ -41,6 +43,25 @@ def _icon_label(name: str, token: str = "text_secondary", size: int = 16) -> QLa
     except Exception:  # icons stub before G5
         pass
     return lb
+
+
+class _IssueDot(QWidget):
+    """The red dot in front of the summary of a step with required settings missing: painted in the
+    theme's error colour (like a status chip's dot), the same size in every font and scale."""
+
+    SIZE = 8
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setFixedSize(self.SIZE, self.SIZE)
+
+    def paintEvent(self, event: QPaintEvent | None) -> None:
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(theme.color("error"))
+        p.drawEllipse(QRectF(self.rect()).adjusted(0.5, 0.5, -0.5, -0.5))
+        p.end()
 
 
 class _StepRow(QWidget):
@@ -64,14 +85,21 @@ class _StepRow(QWidget):
         self.title.setProperty("role", "body" if step.enabled else "muted")
         self.title.setToolTip(step.type.label())
         col.addWidget(self.title)
+        # the red "required setting missing" dot leads the summary line (「● 尚未設定位置」): beside the
+        # name column it cost the name 18 px and cut 「5. 框出結果訊息的範圍」 in fresh template profiles
+        line2 = QHBoxLayout()
+        line2.setContentsMargins(0, 0, 0, 0)
+        line2.setSpacing(4)
+        self.issue = _IssueDot(self)
+        self.issue.setToolTip(tr("這一步還有必填項目沒設定", "This step has required settings missing"))
+        self.issue.setAccessibleName(self.issue.toolTip())
+        self.issue.setVisible(error)
+        line2.addWidget(self.issue, 0, Qt.AlignmentFlag.AlignVCenter)
         self.summary = w.ElidedLabel(step.summary() if step.enabled else tr("（已停用）", "(disabled)"))
         self.summary.setProperty("role", "muted")
-        col.addWidget(self.summary)
+        line2.addWidget(self.summary, 1)
+        col.addLayout(line2)
         lay.addLayout(col, 1)
-        self.issue = w.label("●", "error")
-        self.issue.setToolTip(tr("這一步還有必填項目沒設定", "This step has required settings missing"))
-        self.issue.setVisible(error)
-        lay.addWidget(self.issue)
         self.enable = w.Switch(step.enabled)
         self.enable.setToolTip(tr("啟用這一步", "Enable this step"))
         self.enable.setAccessibleName(tr(f"啟用第 {index + 1} 步", f"Enable step {index + 1}"))

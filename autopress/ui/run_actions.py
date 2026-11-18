@@ -206,18 +206,38 @@ def first_runnable(ctx: AppContext, profile: Profile, selection: Any = None) -> 
 
 def restart_as_admin_flow(parent: QWidget | None, ctx: AppContext | None = None) -> bool:
     """「以系統管理員身分重新啟動」 (the pre-flight action and the window picker's button): confirm,
-    start the elevated instance (win32.elevation.restart_as_admin) and quit, as the pre-flight action
-    did before (no Save / Discard question of its own). True when the restart was started; a
-    cancelled consent prompt is explained. ``ctx`` is accepted for the callers' convenience."""
+    then - with ``ctx`` - ask Save / Discard / Cancel for unsaved profile edits, then start the
+    elevated instance (win32.elevation.restart_as_admin) and quit. The question comes BEFORE the
+    elevated instance starts: that instance waits only app.LOCK_WAIT_MS for this one to quit, so a
+    question from MainWindow.closeEvent after it had started made a slow answer, or 取消, end with no
+    AutoPress running. 取消 (or a failed save) starts nothing; 不儲存 takes effect only when the
+    restart started, so a cancelled consent prompt (explained) keeps the edits, still unsaved. True
+    when the restart was started."""
     title = tr("以系統管理員身分重新啟動", "Restart as administrator")
     text = tr("要以系統管理員身分重新啟動 AutoPress 嗎？\n\n以系統管理員身分執行時，無法從檔案總管拖放檔案，請改用「開啟檔案」。",
               "Restart AutoPress as administrator?\n\nWhile running as administrator, files cannot be dragged "
               "in from Explorer; use Open file.")
     if not w.confirm(parent, title, text, tr("重新啟動", "Restart"), tr("取消", "Cancel")):
         return False
+    page = profiles_page(ctx) if ctx is not None else None
+    discard = False
+    if page is not None and callable(getattr(page, "is_dirty", None)) and page.is_dirty():
+        from . import profiles_dialogs
+
+        profile = page.working_profile() if callable(getattr(page, "working_profile", None)) else None
+        answer = profiles_dialogs.ask_save_changes(parent, getattr(profile, "name", "") or "")
+        if answer == "save":
+            if not page.save_profile():
+                return False  # not saved (a storage error or the newer-version warning): keep running
+        elif answer == "discard":
+            discard = True
+        else:
+            return False  # 取消: nothing was started
     from ..win32 import elevation
 
     if call(elevation.restart_as_admin, default=False):
+        if discard:
+            call(page.discard_changes)  # closing must not ask again: the new instance is already waiting
         QApplication.quit()
         return True
     w.message(parent, title,

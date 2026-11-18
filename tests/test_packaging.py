@@ -159,6 +159,15 @@ def test_spec_data_filter_keeps_only_the_zh_tw_qt_translation(monkeypatch: pytes
     assert [d[0] for d in ns["a"].datas] == [datas[0][0], datas[3][0], datas[4][0]]
 
 
+def test_spec_data_filter_drops_local_backup_copies(monkeypatch: pytest.MonkeyPatch) -> None:
+    datas = [("autopress\\resources\\templates\\web_generic.autopress.json", "s", "DATA"),
+             ("autopress\\resources\\templates\\web_generic.autopress.json.bak-20261118", "s", "DATA"),
+             ("autopress\\resources\\icon.png", "s", "DATA"),
+             ("autopress\\resources\\icon.png.BAK-20261118", "s", "DATA")]
+    ns = exec_spec(monkeypatch, datas=datas)
+    assert [d[0] for d in ns["a"].datas] == [datas[0][0], datas[2][0]]
+
+
 def test_version_resource_matches_the_app(monkeypatch: pytest.MonkeyPatch) -> None:
     ns = exec_spec(monkeypatch)
     text = (ROOT / "version_info.txt").read_text(encoding="utf-8")
@@ -395,12 +404,80 @@ def _local_links(md: Path) -> list[str]:
 def test_readme_opens_with_unzip_smartscreen_and_antivirus_steps() -> None:
     text = (ROOT / "README.md").read_text(encoding="utf-8")
     first = text[: text.index("## 它能做什麼")]
-    for needle in ("下載後先解壓縮", "Windows 已保護您的電腦", "其他資訊", "仍要執行", "防毒軟體"):
+    for needle in ("下載後先解壓縮", "Windows 已保護您的電腦", "其他資訊", "仍要執行", "防毒軟體",
+                   "Source code (zip)"):  # the Releases page always offers the source zip next to the asset
         assert needle in first, needle
-    assert "（待定）下載方式尚未決定" in text  # PX-21: no download instructions yet
+    assert "https://github.com/Stardust-mio/AUTOPRESS/releases/latest" in text  # PX-21: public repo + Releases
+    assert "## 能用在哪裡" in text  # where it works, limits, tested status (requirements item 10)
     assert "## Quick start (English)" in text and "Run anyway" in text and "Unzip first" in text
     assert "docs/user_guide.md" in text and "portable.txt" in text
     assert "<img" not in text.lower()
+
+
+def test_user_guide_opens_with_download_unzip_and_smartscreen_then_the_first_run_order() -> None:
+    guide = ROOT / "docs" / "user_guide.md"
+    if not guide.is_file():
+        pytest.skip("docs/user_guide.md is written after integration (real screenshots, SPEC 10.4)")
+    text = guide.read_text(encoding="utf-8")
+    first = text[: text.index("## 目錄")]
+    for needle in ("下載後先解壓縮", "Source code (zip)", "Windows 已保護您的電腦", "其他資訊", "仍要執行", "防毒軟體",
+                   "https://github.com/Stardust-mio/AUTOPRESS/blob/main/docs/user_guide.md"):  # the zip copy has no pictures
+        assert needle in first, needle
+    order = [text.index(h) for h in ("## 第一次使用：照這個順序", "## 第一次開啟", "## 設定檔與設定精靈", "## 加入序號",
+                                      "## 開始兌換")]
+    assert order == sorted(order)  # the chapters follow the first-run order: profile before codes
+
+
+def test_user_guide_images_carry_the_manifest_captions_in_order() -> None:
+    """Each image of docs/images/shots.json appears once, in manifest order, followed by its numbered captions
+    exactly as tools/screenshots.py draws them (the guide's captions are the manifest's texts)."""
+    guide = ROOT / "docs" / "user_guide.md"
+    if not guide.is_file():
+        pytest.skip("docs/user_guide.md is written after integration (real screenshots, SPEC 10.4)")
+    text = guide.read_text(encoding="utf-8")
+    manifest = json.loads((ROOT / "docs" / "images" / "shots.json").read_text(encoding="utf-8"))
+    pos = -1
+    for img in manifest["images"]:
+        captions = [f"{c['n']}. {c['text'].strip()}" for c in sorted(img["callouts"], key=lambda c: c["n"])]
+        block = "\n".join([f"![{img['alt']}](images/{img['name']}.png)", "", *captions])
+        assert text.count(f"(images/{img['name']}.png)") == 1, img["name"]
+        at = text.find(block)
+        assert at > pos, f"{img['name']}: image block missing, changed or out of order"
+        pos = at
+        assert (guide.parent / "images" / f"{img['name']}.png").is_file(), img["name"]
+
+
+SHIPPED_DOCS = ("README.md", "CHANGELOG.md", "THIRD-PARTY-NOTICES.md", "docs/user_guide.md")
+
+
+def _in_release_zip(rel: str) -> bool:
+    """build.ps1 stages README, LICENSE, THIRD-PARTY-NOTICES.md, CHANGELOG.md, licenses/, docs/user_guide.md
+    and the top-level docs/images/*.png - nothing else of the repo (no SPEC.md, no docs/images/raw/)."""
+    if rel in ("README.md", "LICENSE", "THIRD-PARTY-NOTICES.md", "CHANGELOG.md", "docs/user_guide.md", "licenses"):
+        return True
+    return rel.startswith("licenses/") or re.fullmatch(r"docs/images/[^/]+\.png", rel) is not None
+
+
+@pytest.mark.parametrize("doc", SHIPPED_DOCS)
+def test_shipped_docs_link_only_files_that_are_in_the_zip(doc: str) -> None:
+    md = ROOT / doc
+    if not md.is_file():
+        pytest.skip(f"{doc} not written yet")
+    build = BUILD_PS1.read_text(encoding="utf-8-sig")
+    assert "'README.md', 'LICENSE', 'THIRD-PARTY-NOTICES.md', 'CHANGELOG.md'" in build and "docs\\user_guide.md" in build
+    for target in _local_links(md):
+        path = target.split("#", 1)[0]
+        if not path:
+            continue
+        rel = (md.parent / path).resolve().relative_to(ROOT.resolve()).as_posix()
+        assert _in_release_zip(rel), f"{doc}: {target} is not in the release zip; link it by its GitHub URL"
+
+
+def test_settings_about_names_the_repository_the_docs_link() -> None:
+    from autopress.ui.settings_page import REPO_URL
+
+    assert f"{REPO_URL}/releases/latest" in (ROOT / "README.md").read_text(encoding="utf-8")
+    assert "發佈後提供連結" not in (ROOT / "autopress" / "ui" / "settings_page.py").read_text(encoding="utf-8")
 
 
 @pytest.mark.parametrize("doc", ["README.md", "THIRD-PARTY-NOTICES.md", "CHANGELOG.md", "docs/user_guide.md"])
